@@ -1,0 +1,12 @@
+services:
+  rstudio:
+    build: .
+    image: rstudio-rstudio-1
+    ports:
+      - "8787:8787"
+    environment:
+      - PASSWORD=""
+      - DISABLE_AUTH=true
+    volumes:
+      - .:/home/rstudio/project
+    restart: unless-stopped

@@ -1,0 +1,24 @@
+# OS files
+.DS_Store
+Thumbs.db
+
+# RStudio cache
+.Rhistory
+.RData
+.rdata
+.R.cache
+
+# Session info
+sessionInfo.json
+
+# Temporary files
+*.Rproj.user
+*~
+
+# Compiled data
+*.rdb
+*.rda
+*.rdp
+
+# Build artifacts
+man/
