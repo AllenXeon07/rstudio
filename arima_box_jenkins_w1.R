@@ -1,3 +1,9 @@
+suppressPackageStartupMessages({
+  library(forecast)
+  library(tseries)
+  library(lmtest)
+})
+
 project_root <- if (dir.exists("/home/rstudio/project")) {
   "/home/rstudio/project"
 } else {
@@ -32,34 +38,38 @@ if (!dir.exists(output_dir) || file.access(output_dir, 2) != 0) {
 }
 
 coefficient_table <- function(fit) {
-  if (length(fit$coef) == 0) {
+  ct <- tryCatch(lmtest::coeftest(fit), error = function(e) NULL)
+  if (is.null(ct) || nrow(ct) == 0) {
     return(data.frame(note = "No AR, MA, or intercept coefficients estimated."))
   }
 
-  se <- sqrt(diag(fit$var.coef))
-  z_value <- fit$coef / se
-  p_value <- 2 * (1 - pnorm(abs(z_value)))
-
   data.frame(
-    parameter = names(fit$coef),
-    estimate = as.numeric(fit$coef),
-    std_error = as.numeric(se),
-    z_value = as.numeric(z_value),
-    p_value = as.numeric(p_value),
+    parameter = rownames(ct),
+    estimate = as.numeric(ct[, 1]),
+    std_error = as.numeric(ct[, 2]),
+    z_value = as.numeric(ct[, 3]),
+    p_value = as.numeric(ct[, 4]),
     row.names = NULL
   )
 }
 
 diagnostic_tests <- function(fit) {
   resid <- residuals(fit)
-  fitdf <- length(fit$coef)
-  lb_lag <- min(10, length(resid) - fitdf - 1)
+  lb_res <- tryCatch(
+    checkresiduals(fit, plot = FALSE),
+    error = function(e) {
+      fitdf <- length(fit$coef)
+      lb_lag <- min(10, length(resid) - fitdf - 1)
+      Box.test(resid, lag = lb_lag, type = "Ljung-Box", fitdf = fitdf)
+    }
+  )
+  shapiro_res <- shapiro.test(resid)
 
   list(
     residuals = resid,
-    ljung_box = Box.test(resid, lag = lb_lag, type = "Ljung-Box", fitdf = fitdf),
-    shapiro = shapiro.test(resid),
-    lb_lag = lb_lag,
+    ljung_box = lb_res,
+    shapiro = shapiro_res,
+    lb_lag = as.numeric(lb_res$parameter),
     mean_residual = mean(resid),
     variance_residual = var(resid)
   )
@@ -82,13 +92,7 @@ inverse_box_cox <- function(x, lambda) {
 }
 
 estimate_box_cox_lambda <- function(x) {
-  lambdas <- seq(-2, 2, by = 0.05)
-  log_likelihood <- vapply(lambdas, function(lambda) {
-    transformed <- box_cox_transform(x, lambda)
-    -length(x) / 2 * log(var(transformed)) + (lambda - 1) * sum(log(x))
-  }, numeric(1))
-
-  lambdas[which.max(log_likelihood)]
+  as.numeric(forecast::BoxCox.lambda(x, method = "loglik"))
 }
 
 variance_stationarity_check <- function(x, alpha = 0.05) {
@@ -110,59 +114,31 @@ variance_stationarity_check <- function(x, alpha = 0.05) {
   )
 }
 
-adf_stationarity_check <- function(x, alpha = 0.05, critical_value = -2.86, max_lag = NULL) {
+adf_stationarity_check <- function(x, alpha = 0.05, k = NULL) {
   values <- as.numeric(x)
-  values_diff <- diff(values)
-
-  if (is.null(max_lag)) {
-    max_lag <- min(5, floor((length(values) - 1) / 4))
+  if (is.null(k)) {
+    k <- min(2, max(1, trunc((length(values) - 1)^(1/3))))
   }
-
-  adf_candidates <- list()
-  for (lag_order in 0:max_lag) {
-    diff_index <- (lag_order + 1):length(values_diff)
-    adf_data <- data.frame(
-      response = values_diff[diff_index],
-      lagged_level = values[diff_index]
-    )
-
-    if (lag_order > 0) {
-      for (lag_i in 1:lag_order) {
-        adf_data[[paste0("diff_lag_", lag_i)]] <- values_diff[diff_index - lag_i]
-      }
-    }
-
-    model <- lm(response ~ ., data = adf_data)
-    adf_candidates[[lag_order + 1]] <- list(
-      lag_order = lag_order,
-      model = model,
-      aic = AIC(model)
-    )
-  }
-
-  aic_values <- vapply(adf_candidates, function(candidate) candidate$aic, numeric(1))
-  best_candidate <- adf_candidates[[which.min(aic_values)]]
-  model <- best_candidate$model
-  statistic <- summary(model)$coefficients["lagged_level", "t value"]
-  reject_h0 <- statistic < critical_value
+  test <- tseries::adf.test(values, alternative = "stationary", k = k)
+  statistic <- as.numeric(test$statistic)
+  p_value <- test$p.value
+  reject_h0 <- p_value < alpha
 
   list(
     alpha = alpha,
     statistic = statistic,
-    critical_value = critical_value,
-    selected_lag = best_candidate$lag_order,
-    selected_aic = best_candidate$aic,
+    p_value = p_value,
+    selected_lag = as.numeric(test$parameter),
     reject_h0 = reject_h0,
     decision = if (reject_h0) "Reject H0" else "Fail to reject H0",
     conclusion = if (reject_h0) "stationary in mean" else "not stationary in mean",
-    regression_type = "With constant",
-    fit = model
+    test = test
   )
 }
 
 safe_arima <- function(x, order) {
   tryCatch(
-    arima(x, order = order, method = "ML"),
+    forecast::Arima(x, order = order, method = "ML"),
     error = function(e) NULL
   )
 }
@@ -207,134 +183,254 @@ write_data_frame_block <- function(x) {
   cat("\n```\n\n")
 }
 
-draw_wrapped_box <- function(x, y, width, height, label, fill, border = "#1f2a44", text_col = "#16213a", cex = 0.9) {
-  rect(x - width / 2, y - height / 2, x + width / 2, y + height / 2, col = fill, border = border, lwd = 2)
-  lines <- strwrap(label, width = 28)
-  text(x, y, paste(lines, collapse = "\n"), cex = cex, col = text_col, font = 2)
-}
-
-draw_flow_arrow <- function(x0, y0, x1, y1, label = NULL) {
-  arrows(x0, y0, x1, y1, length = 0.08, lwd = 2, col = "#334155")
-  if (!is.null(label)) {
-    text((x0 + x1) / 2, (y0 + y1) / 2 + 0.025, label, cex = 0.8, col = "#334155", font = 2)
+draw_stem_correlogram <- function(
+  values,
+  lag_max = 20,
+  main_title,
+  subtitle_text,
+  is_acf = TRUE,
+  col_bar = "#2563eb",
+  col_line = "#ea580c"
+) {
+  n <- length(values)
+  thresh <- 2 / sqrt(n)
+  lag_limit <- min(lag_max, n - 1)
+  if (is_acf) {
+    cf_res <- forecast::Acf(values, lag.max = lag_limit, plot = FALSE)
+    vals <- as.numeric(cf_res$acf)
+  } else {
+    cf_res <- forecast::Pacf(values, lag.max = lag_limit, plot = FALSE)
+    vals <- as.numeric(cf_res$acf)
   }
+  lags <- seq_along(vals)
+
+  ylim_r <- range(c(vals, -thresh * 1.35, thresh * 1.35, -0.45, 0.65))
+  plot(
+    lags, vals, type = "n",
+    xlim = c(0.4, lag_limit + 0.6), ylim = ylim_r,
+    xlab = "Lag", ylab = if (is_acf) "Autocorrelation (ACF)" else "Partial Autocorrelation (PACF)",
+    main = "", xaxt = "n"
+  )
+  mtext(main_title, side = 3, line = 1.4, font = 2, cex = 1.0, col = "#0f172a")
+  mtext(subtitle_text, side = 3, line = 0.2, font = 3, cex = 0.78, col = "#64748b")
+
+  at_ticks <- c(1, 5, 10, 15, 20)[c(1, 5, 10, 15, 20) <= lag_limit]
+  axis(1, at = at_ticks, col.axis = "#334155")
+  grid(col = "#e2e8f0", lty = 1)
+  abline(h = 0, col = "#64748b", lwd = 1.3)
+  abline(h = c(-thresh, thresh), col = col_line, lty = 2, lwd = 1.6)
+
+  segments(lags, 0, lags, vals, lwd = 3.8, col = col_bar)
+  points(lags, vals, pch = 16, col = col_bar, cex = 1.05)
+
+  legend(
+    "topright",
+    legend = sprintf("Batas Signifikansi ±2/√n (±%.3f)", thresh),
+    col = col_line, lty = 2, lwd = 1.6, bty = "o", box.col = "#cbd5e1", bg = "#ffffff", cex = 0.78
+  )
 }
 
 draw_stationarity_decision_diagram <- function(
   path,
   label,
+  raw_ts,
+  stationary_ts,
   variance_result,
   variance_treatment,
   mean_acf_pacf_before_difference,
+  mean_acf_pacf_final,
   adf_result_before_difference,
   adf_result,
   mean_treatment,
   difference_order
 ) {
-  variance_fill <- if (variance_result$reject_h0) "#fde2d2" else "#dff1e6"
-  mean_initial_fill <- if (adf_result_before_difference$reject_h0) "#dff1e6" else "#fde2d2"
-  mean_final_fill <- if (adf_result$reject_h0) "#dff1e6" else "#fde2d2"
+  png(path, width = 1450, height = 880, res = 100)
+  par(
+    oma = c(3.2, 1.2, 4.2, 1.2),
+    mar = c(4.2, 4.2, 3.6, 1.5),
+    mfrow = c(2, 3),
+    bg = "#f8fafc"
+  )
 
-  png(path, width = 1200, height = 720)
-  par(mar = c(0, 0, 0, 0), xpd = NA)
-  plot.new()
-  plot.window(xlim = c(0, 1), ylim = c(0, 1))
+  # --- ROW 1: SEBELUM DIFFERENCING ---
+  y_raw <- as.numeric(raw_ts)
+  time_raw <- if (!is.null(time(raw_ts))) as.numeric(time(raw_ts)) else seq_along(y_raw)
+  m_raw <- mean(y_raw)
+  s_raw <- sd(y_raw)
+  reg_raw <- lm(y_raw ~ time_raw)
+  trend_slope_raw <- coef(reg_raw)[2]
 
-  text(0.03, 0.95, paste(label, "- Stationarity Decision Diagram"), adj = 0, cex = 1.35, font = 2, col = "#16213a")
-  text(0.03, 0.90, "Box-Jenkins stationarity path: check variance first, then check mean.", adj = 0, cex = 0.9, col = "#475569")
+  y_min_raw <- min(y_raw, m_raw - 2 * s_raw)
+  y_max_raw <- max(y_raw, m_raw + 2 * s_raw)
+  y_range_raw <- y_max_raw - y_min_raw
 
-  text(0.03, 0.81, "Variance Stationarity", adj = 0, cex = 1.05, font = 2, col = "#1f5f99")
-  draw_wrapped_box(0.14, 0.68, 0.19, 0.16, "Plot modelling data and compare variance in first vs second half", "#e8f1fb")
-  draw_wrapped_box(
-    0.39,
-    0.68,
-    0.20,
-    0.18,
-    sprintf(
-      "F-test H0: equal variance\np = %.4f, alpha = %.2f\nDecision: %s",
-      variance_result$p_value,
-      variance_result$alpha,
-      variance_result$decision
-    ),
-    variance_fill
+  plot(
+    time_raw, y_raw, type = "o", pch = 16, col = "#2563eb", cex = 0.9,
+    xlab = "Period", ylab = "Value (Zt)",
+    main = "",
+    ylim = c(y_min_raw - 0.08 * y_range_raw, y_max_raw + 0.35 * y_range_raw)
   )
-  draw_wrapped_box(
-    0.65,
-    0.68,
-    0.20,
-    0.16,
-    paste("Conclusion:", variance_result$conclusion),
-    variance_fill
-  )
-  draw_wrapped_box(0.88, 0.68, 0.18, 0.16, variance_treatment, "#fff1dc")
-  draw_flow_arrow(0.235, 0.68, 0.29, 0.68)
-  draw_flow_arrow(0.49, 0.68, 0.55, 0.68)
-  draw_flow_arrow(0.75, 0.68, 0.79, 0.68)
+  mtext("Sebelum: Time Series Level & Line Tools", side = 3, line = 1.4, font = 2, cex = 1.0, col = "#0f172a")
+  mtext("Trend line (merah), Mean (abu-abu), Batas varians ±2σ (oranye)", side = 3, line = 0.2, font = 3, cex = 0.78, col = "#64748b")
+  grid(col = "#e2e8f0", lty = 1)
+  abline(reg_raw, col = "#dc2626", lwd = 2.4)
+  abline(h = m_raw, col = "#475569", lty = 2, lwd = 1.8)
+  abline(h = c(m_raw - 2 * s_raw, m_raw + 2 * s_raw), col = "#ea580c", lty = 3, lwd = 1.6)
 
-  text(0.03, 0.49, "Mean Stationarity", adj = 0, cex = 1.05, font = 2, col = "#1f5f99")
-  draw_wrapped_box(
-    0.14,
-    0.34,
-    0.19,
-    0.20,
-    sprintf(
-      "ACF/PACF check\nACF lag 1 = %.4f\nPACF lag 1 = %.4f\nDecision: %s",
-      mean_acf_pacf_before_difference$acf_lag_1,
-      mean_acf_pacf_before_difference$pacf_lag_1,
-      mean_acf_pacf_before_difference$decision
-    ),
-    "#e8f1fb",
-    cex = 0.82
+  x_start_raw <- min(time_raw)
+  x_span_raw <- diff(range(time_raw))
+  rect(
+    xleft = x_start_raw - 0.02 * x_span_raw,
+    ybottom = y_max_raw + 0.16 * y_range_raw,
+    xright = x_start_raw + 0.38 * x_span_raw,
+    ytop = y_max_raw + 0.33 * y_range_raw,
+    col = if (adf_result_before_difference$reject_h0) "#dcfce7" else "#fee2e2",
+    border = if (adf_result_before_difference$reject_h0) "#22c55e" else "#ef4444",
+    lwd = 1.5
   )
-  draw_wrapped_box(
-    0.39,
-    0.34,
-    0.20,
-    0.20,
-    sprintf(
-      "ADF H0: unit root\nstat = %.4f\ncritical = %.2f\nDecision: %s",
-      adf_result_before_difference$statistic,
-      adf_result_before_difference$critical_value,
-      adf_result_before_difference$decision
-    ),
-    mean_initial_fill,
-    cex = 0.82
-  )
-  draw_wrapped_box(
-    0.65,
-    0.34,
-    0.20,
-    0.18,
-    sprintf("Treatment\n%s", mean_treatment),
-    "#fff1dc"
-  )
-  draw_wrapped_box(
-    0.88,
-    0.34,
-    0.18,
-    0.20,
-    sprintf(
-      "Final ADF\nstat = %.4f\ncritical = %.2f\nd = %s\nConclusion: %s",
-      adf_result$statistic,
-      adf_result$critical_value,
-      difference_order,
-      adf_result$conclusion
-    ),
-    mean_final_fill,
-    cex = 0.8
-  )
-  draw_flow_arrow(0.235, 0.34, 0.29, 0.34)
-  draw_flow_arrow(0.49, 0.34, 0.55, 0.34)
-  draw_flow_arrow(0.75, 0.34, 0.79, 0.34)
-
+  status_text_raw <- if (adf_result_before_difference$reject_h0) {
+    sprintf("STATUS: STASIONER MEAN\nADF τ = %.2f, p = %.4f", adf_result_before_difference$statistic, adf_result_before_difference$p_value)
+  } else {
+    sprintf("STATUS: TIDAK STASIONER\nADF τ = %.2f, p = %.4f", adf_result_before_difference$statistic, adf_result_before_difference$p_value)
+  }
   text(
-    0.03,
-    0.09,
-    "Interpretation: green boxes indicate stationarity/fail-safe status; orange boxes indicate treatment; the final stationary series is used for ACF/PACF model identification.",
-    adj = 0,
-    cex = 0.85,
-    col = "#475569"
+    x = x_start_raw + 0.19 * x_span_raw,
+    y = y_max_raw + 0.245 * y_range_raw,
+    labels = status_text_raw,
+    col = if (adf_result_before_difference$reject_h0) "#166534" else "#991b1b",
+    font = 2, cex = 0.72
   )
+
+  legend(
+    "topright",
+    legend = c(
+      "Observed Zt",
+      sprintf("Trend (slope = %.3f)", trend_slope_raw),
+      sprintf("Mean (μ = %.2f)", m_raw),
+      "Batas Varians ±2σ"
+    ),
+    col = c("#2563eb", "#dc2626", "#475569", "#ea580c"),
+    lty = c(1, 1, 2, 3), pch = c(16, NA, NA, NA), lwd = c(1.5, 2.4, 1.8, 1.6),
+    bty = "o", box.col = "#cbd5e1", bg = "#ffffff", cex = 0.73
+  )
+
+  draw_stem_correlogram(
+    y_raw,
+    main_title = "Sebelum: Correlogram ACF",
+    subtitle_text = sprintf("Lag 1 = %.2f; evaluasi penurunan menuju batas ±2/√n", mean_acf_pacf_before_difference$acf_lag_1),
+    is_acf = TRUE, col_bar = "#2563eb", col_line = "#ea580c"
+  )
+
+  draw_stem_correlogram(
+    y_raw,
+    main_title = "Sebelum: Correlogram PACF",
+    subtitle_text = sprintf("Lag 1 = %.2f; cut-off teramati sebelum differencing", mean_acf_pacf_before_difference$pacf_lag_1),
+    is_acf = FALSE, col_bar = "#2563eb", col_line = "#ea580c"
+  )
+
+  # --- ROW 2: SESUDAH DIFFERENCING ---
+  y_stat <- as.numeric(stationary_ts)
+  time_stat <- if (!is.null(time(stationary_ts))) as.numeric(time(stationary_ts)) else seq_along(y_stat)
+  m_stat <- mean(y_stat)
+  s_stat <- sd(y_stat)
+  reg_stat <- lm(y_stat ~ time_stat)
+  trend_slope_stat <- coef(reg_stat)[2]
+
+  y_min_stat <- min(y_stat, m_stat - 2 * s_stat)
+  y_max_stat <- max(y_stat, m_stat + 2 * s_stat)
+  y_range_stat <- y_max_stat - y_min_stat
+
+  row2_title <- if (difference_order > 0) {
+    sprintf("Sesudah: Differenced Series (d = %s) & Line Tools", difference_order)
+  } else {
+    "Sesudah: Stationary Series (d = 0) & Line Tools"
+  }
+  row2_subtitle <- if (difference_order > 0) {
+    "Tren tereleminasi (garis tren datar); berfluktuasi stabil di sekitar nol"
+  } else {
+    "Data berfluktuasi stabil di sekitar satu nilai rata-rata konstan"
+  }
+
+  plot(
+    time_stat, y_stat, type = "o", pch = 16, col = "#059669", cex = 0.9,
+    xlab = "Period", ylab = if (difference_order > 0) sprintf("Differenced Wt (d = %s)", difference_order) else "Stationary Zt",
+    main = "",
+    ylim = c(y_min_stat - 0.08 * y_range_stat, y_max_stat + 0.35 * y_range_stat)
+  )
+  mtext(row2_title, side = 3, line = 1.4, font = 2, cex = 1.0, col = "#0f172a")
+  mtext(row2_subtitle, side = 3, line = 0.2, font = 3, cex = 0.78, col = "#64748b")
+  grid(col = "#e2e8f0", lty = 1)
+  abline(reg_stat, col = "#16a34a", lwd = 2.4)
+  abline(h = m_stat, col = "#475569", lty = 2, lwd = 1.8)
+  abline(h = c(m_stat - 2 * s_stat, m_stat + 2 * s_stat), col = "#ea580c", lty = 3, lwd = 1.6)
+
+  x_start_stat <- min(time_stat)
+  x_span_stat <- diff(range(time_stat))
+  rect(
+    xleft = x_start_stat - 0.02 * x_span_stat,
+    ybottom = y_max_stat + 0.16 * y_range_stat,
+    xright = x_start_stat + 0.38 * x_span_stat,
+    ytop = y_max_stat + 0.33 * y_range_stat,
+    col = if (adf_result$reject_h0) "#dcfce7" else "#fee2e2",
+    border = if (adf_result$reject_h0) "#22c55e" else "#ef4444",
+    lwd = 1.5
+  )
+  status_text_stat <- if (adf_result$reject_h0) {
+    sprintf("STATUS: STASIONER MEAN\nADF τ = %.2f, p = %.4f (Tolak H0)", adf_result$statistic, adf_result$p_value)
+  } else {
+    sprintf("STATUS: BELUM STASIONER\nADF τ = %.2f, p = %.4f", adf_result$statistic, adf_result$p_value)
+  }
+  text(
+    x = x_start_stat + 0.19 * x_span_stat,
+    y = y_max_stat + 0.245 * y_range_stat,
+    labels = status_text_stat,
+    col = if (adf_result$reject_h0) "#166534" else "#991b1b",
+    font = 2, cex = 0.72
+  )
+
+  legend(
+    "topright",
+    legend = c(
+      if (difference_order > 0) sprintf("Diff Series (d = %s)", difference_order) else "Stationary Series",
+      sprintf("Trend (slope = %.3f)", trend_slope_stat),
+      sprintf("Mean (μ = %.2f)", m_stat),
+      "Batas Varians ±2σ"
+    ),
+    col = c("#059669", "#16a34a", "#475569", "#ea580c"),
+    lty = c(1, 1, 2, 3), pch = c(16, NA, NA, NA), lwd = c(1.5, 2.4, 1.8, 1.6),
+    bty = "o", box.col = "#cbd5e1", bg = "#ffffff", cex = 0.73
+  )
+
+  draw_stem_correlogram(
+    y_stat,
+    main_title = if (difference_order > 0) sprintf("Sesudah: Correlogram ACF (d = %s)", difference_order) else "Sesudah: Correlogram ACF",
+    subtitle_text = "Autokorelasi langsung masuk ke dalam batas signifikansi ±2/√n",
+    is_acf = TRUE, col_bar = "#059669", col_line = "#ea580c"
+  )
+
+  draw_stem_correlogram(
+    y_stat,
+    main_title = if (difference_order > 0) sprintf("Sesudah: Correlogram PACF (d = %s)", difference_order) else "Sesudah: Correlogram PACF",
+    subtitle_text = "Autokorelasi parsial stabil di dalam batas signifikansi ±2/√n",
+    is_acf = FALSE, col_bar = "#059669", col_line = "#ea580c"
+  )
+
+  mtext(
+    paste(label, "- Evaluasi Stasioneritas & Penanganan Differencing"),
+    side = 3, line = 2.0, outer = TRUE, cex = 1.35, font = 2, col = "#0f172a"
+  )
+  mtext(
+    "Box-Jenkins: Line tools untuk deteksi tren & varians, diikuti evaluasi korelogram ACF/PACF sebelum dan sesudah differencing",
+    side = 3, line = 0.5, outer = TRUE, cex = 0.95, col = "#475569"
+  )
+
+  footer_text <- sprintf(
+    "Keputusan Box-Jenkins: Varians %s (F-test p = %.4f, %s). Mean %s setelah differencing d = %s (ADF %s). Siap identifikasi ARIMA.",
+    variance_result$conclusion, variance_result$p_value, variance_treatment,
+    adf_result$conclusion, difference_order, adf_result$decision
+  )
+  mtext(footer_text, side = 1, line = 1.2, outer = TRUE, cex = 0.88, font = 2, col = "#1e293b")
+
   dev.off()
 }
 
@@ -489,7 +585,7 @@ run_box_jenkins_analysis <- function(label, model_data, test_data = NULL, prefix
     }
   }
 
-  adf_lag_strategy <- "Independent analysis: choose the number of lagged differenced terms automatically by AIC, then apply the ADF H0 decision rule."
+  adf_lag_strategy <- "Standard Augmented Dickey-Fuller test via tseries::adf.test() with p-value decision rule."
   mean_acf_pacf_before_difference <- diagnose_mean_stationarity_from_acf_pacf(variance_adjusted_ts)
   adf_result_before_difference <- adf_stationarity_check(variance_adjusted_ts)
   mean_initially_stationary <- adf_result_before_difference$reject_h0
@@ -515,45 +611,97 @@ run_box_jenkins_analysis <- function(label, model_data, test_data = NULL, prefix
   draw_stationarity_decision_diagram(
     path = plot_path$stationarity_decision,
     label = label,
+    raw_ts = variance_adjusted_ts,
+    stationary_ts = stationary_ts,
     variance_result = variance_result,
     variance_treatment = variance_treatment,
     mean_acf_pacf_before_difference = mean_acf_pacf_before_difference,
+    mean_acf_pacf_final = mean_acf_pacf_final,
     adf_result_before_difference = adf_result_before_difference,
     adf_result = adf_result,
     mean_treatment = mean_treatment,
     difference_order = difference_order
   )
 
-  png(plot_path$variance, width = 900, height = 550)
+  png(plot_path$variance, width = 950, height = 560)
+  y_v <- as.numeric(variance_adjusted_ts)
+  t_v <- if (!is.null(time(variance_adjusted_ts))) as.numeric(time(variance_adjusted_ts)) else seq_along(y_v)
+  m_v <- mean(y_v)
+  s_v <- sd(y_v)
+  split_idx <- floor(length(y_v) / 2)
+  split_time <- t_v[split_idx] + 0.5
   plot(
-    variance_adjusted_ts,
+    t_v, y_v,
     type = "o",
     pch = 16,
-    col = "#d55e00",
+    col = "#2563eb",
     xlab = "Period",
     ylab = "Value",
-    main = paste(label, "- Variance Stationarity / Box-Cox Result")
+    main = paste(label, "- Variance Stationarity Check & Line Tools"),
+    ylim = range(c(y_v, m_v + 2.4 * s_v, m_v - 2.4 * s_v))
   )
-  grid()
+  grid(col = "#e2e8f0")
+  abline(h = m_v, col = "#475569", lty = 2, lwd = 1.8)
+  abline(h = c(m_v - 2 * s_v, m_v + 2 * s_v), col = "#ea580c", lty = 3, lwd = 1.8)
+  abline(v = split_time, col = "#94a3b8", lty = 4, lwd = 1.5)
+  legend(
+    "topright",
+    legend = c(
+      "Variance-adjusted series",
+      sprintf("Mean line (μ = %.2f)", m_v),
+      "Fluctuation bounds (±2σ)",
+      sprintf("Split boundary (period %d)", split_idx),
+      sprintf("F-test: stat = %.4f, p = %.4f (%s)", variance_result$statistic, variance_result$p_value, variance_result$decision)
+    ),
+    col = c("#2563eb", "#475569", "#ea580c", "#94a3b8", NA),
+    lty = c(1, 2, 3, 4, NA),
+    pch = c(16, NA, NA, NA, NA),
+    lwd = c(1.5, 1.8, 1.8, 1.5, NA),
+    bty = "o", box.col = "#cbd5e1", bg = "#ffffff", cex = 0.8
+  )
   dev.off()
 
-  png(plot_path$mean, width = 900, height = 550)
+  png(plot_path$mean, width = 950, height = 560)
+  y_m <- as.numeric(stationary_ts)
+  t_m <- if (!is.null(time(stationary_ts))) as.numeric(time(stationary_ts)) else seq_along(y_m)
+  m_m <- mean(y_m)
+  s_m <- sd(y_m)
+  reg_m <- lm(y_m ~ t_m)
   plot(
-    stationary_ts,
+    t_m, y_m,
     type = "o",
     pch = 16,
     col = "#009e73",
     xlab = "Period",
     ylab = "Stationary series value",
-    main = sprintf("%s - Mean Stationarity / Differencing Result (d = %s)", label, difference_order)
+    main = sprintf("%s - Mean Stationarity Check (d = %s) & Line Tools", label, difference_order),
+    ylim = range(c(y_m, m_m + 2.4 * s_m, m_m - 2.4 * s_m))
   )
-  grid()
+  grid(col = "#e2e8f0")
+  abline(reg_m, col = "#15803d", lwd = 2.4)
+  abline(h = m_m, col = "#475569", lty = 2, lwd = 1.8)
+  abline(h = c(m_m - 2 * s_m, m_m + 2 * s_m), col = "#ea580c", lty = 3, lwd = 1.8)
+  legend(
+    "topright",
+    legend = c(
+      sprintf("Stationary series (d = %s)", difference_order),
+      sprintf("Fitted trend line (slope = %.4f)", coef(reg_m)[2]),
+      sprintf("Mean line (μ = %.2f)", m_m),
+      "Fluctuation bounds (±2σ)",
+      sprintf("ADF test: stat = %.4f, p = %.4f (%s)", adf_result$statistic, adf_result$p_value, adf_result$decision)
+    ),
+    col = c("#009e73", "#15803d", "#475569", "#ea580c", NA),
+    lty = c(1, 1, 2, 3, NA),
+    pch = c(16, NA, NA, NA, NA),
+    lwd = c(1.5, 2.4, 1.8, 1.8, NA),
+    bty = "o", box.col = "#cbd5e1", bg = "#ffffff", cex = 0.8
+  )
   dev.off()
 
   png(plot_path$acf_pacf, width = 1000, height = 550)
   par(mfrow = c(1, 2))
-  acf(stationary_ts, lag.max = 20, main = paste(label, "- ACF"))
-  pacf(stationary_ts, lag.max = 20, main = paste(label, "- PACF"))
+  forecast::Acf(stationary_ts, lag.max = 20, main = paste(label, "- ACF"))
+  forecast::Pacf(stationary_ts, lag.max = 20, main = paste(label, "- PACF"))
   par(mfrow = c(1, 1))
   dev.off()
 
@@ -589,15 +737,8 @@ run_box_jenkins_analysis <- function(label, model_data, test_data = NULL, prefix
 
   diag_result <- diagnostic_tests(best_fit)
 
-  png(plot_path$diagnostics, width = 1000, height = 800)
-  par(mfrow = c(2, 2))
-  plot(diag_result$residuals, type = "o", pch = 16, main = "Residual Plot", ylab = "Residual")
-  abline(h = 0, col = "red")
-  acf(diag_result$residuals, lag.max = 20, main = "ACF of Residuals")
-  hist(diag_result$residuals, breaks = 10, main = "Histogram of Residuals", xlab = "Residual")
-  qqnorm(diag_result$residuals, main = "Normal Q-Q Plot")
-  qqline(diag_result$residuals, col = "red")
-  par(mfrow = c(1, 1))
+  png(plot_path$diagnostics, width = 1000, height = 750)
+  checkresiduals(best_fit)
   dev.off()
 
   forecast_horizon <- if (has_test_data) nrow(test_data) else future_horizon
@@ -727,8 +868,8 @@ write_analysis_section <- function(result) {
   write_image(result$plot_path$time_series, paste(result$label, "time series plot"))
 
   cat("### 2. Stationarity Check Following the Box-Jenkins Flow\n\n")
-  cat("The diagram below summarizes the variance and mean stationarity decisions before the detailed statistical output.\n\n")
-  write_image(result$plot_path$stationarity_decision, paste(result$label, "stationarity decision diagram"))
+  cat("The diagram below evaluates stationarity before and after differencing using trend and variance line tools alongside ACF and PACF correlograms, aligned with the Box-Jenkins methodology in `docs/ARIMA_Box-Jenkins.pdf`.\n\n")
+  write_image(result$plot_path$stationarity_decision, paste(result$label, "stationarity evaluation diagram"))
 
   cat("#### A. Stationary in Variance?\n\n")
   cat("- **H0:** variance in the first and second half is equal, so data is stationary in variance.\n")
@@ -757,22 +898,22 @@ write_analysis_section <- function(result) {
   cat("- **Reason:** ", result$mean_acf_pacf_before_difference$reason, "\n\n", sep = "")
 
   cat("**ADF decision:**\n\n")
-  cat("- **ADF lag strategy:** ", result$adf_lag_strategy, "\n", sep = "")
-  cat("- **H0:** gamma = 0, data has a unit root, so data is not stationary in mean.\n")
-  cat("- **H1:** gamma < 0, data has no unit root, so data is stationary in mean.\n")
+  cat("- **ADF test function:** `tseries::adf.test()`\n")
+  cat("- **H0:** gamma = 0, series has a unit root, so data is not stationary in mean.\n")
+  cat("- **H1:** gamma < 0, series has no unit root, so data is stationary in mean.\n")
   cat(sprintf("- **Initial ADF statistic before differencing:** %.4f\n", result$adf_result_before_difference$statistic))
-  cat(sprintf("- **Initial selected lag by AIC:** %s\n", result$adf_result_before_difference$selected_lag))
+  cat(sprintf("- **Initial selected lag parameter:** %s\n", result$adf_result_before_difference$selected_lag))
+  cat(sprintf("- **Initial ADF p-value:** %.4f\n", result$adf_result_before_difference$p_value))
   cat(sprintf("- **Final ADF statistic:** %.4f\n", result$adf_result$statistic))
-  cat(sprintf("- **Final selected lag by AIC:** %s\n", result$adf_result$selected_lag))
-  cat(sprintf("- **Final ADF regression AIC:** %.4f\n", result$adf_result$selected_aic))
+  cat(sprintf("- **Final selected lag parameter:** %s\n", result$adf_result$selected_lag))
+  cat(sprintf("- **Final ADF p-value:** %.4f\n", result$adf_result$p_value))
   cat(sprintf("- **Alpha:** %.2f\n", result$adf_result$alpha))
-  cat(sprintf("- **Critical value at 5%%:** %.2f\n", result$adf_result$critical_value))
-  cat("- **Decision rule:** reject H0 if ADF statistic < critical value.\n")
+  cat("- **Decision rule:** reject H0 if p-value < alpha.\n")
   cat("- **Decision:** ", result$adf_result$decision, "\n", sep = "")
   if (result$adf_result$reject_h0) {
-    cat("- **Reason:** ADF statistic is smaller/more negative than the critical value.\n")
+    cat(sprintf("- **Reason:** p-value (%.4f) < alpha (%.2f).\n", result$adf_result$p_value, result$adf_result$alpha))
   } else {
-    cat("- **Reason:** ADF statistic is not smaller/more negative than the critical value.\n")
+    cat(sprintf("- **Reason:** p-value (%.4f) >= alpha (%.2f).\n", result$adf_result$p_value, result$adf_result$alpha))
   }
   cat("- **Conclusion:** modelling series is ", result$adf_result$conclusion, " at 5% significance level.\n", sep = "")
   cat("- **Treatment:** ", result$mean_treatment, "\n\n", sep = "")

@@ -26,9 +26,9 @@ The workflow below follows the ARIMA Box-Jenkins notes in `docs/ARIMA_Box-Jenkin
 
 ### 2. Stationarity Check Following the Box-Jenkins Flow
 
-The diagram below summarizes the variance and mean stationarity decisions before the detailed statistical output.
+The diagram below evaluates stationarity before and after differencing using trend and variance line tools alongside ACF and PACF correlograms, aligned with the Box-Jenkins methodology in `docs/ARIMA_Box-Jenkins.pdf`.
 
-![Analysis 1: Full Data Modelling (45 Entries) stationarity decision diagram](plots_rstudio/full_data_02_stationarity_decision_diagram.png)
+![Analysis 1: Full Data Modelling (45 Entries) stationarity evaluation diagram](plots_rstudio/full_data_02_stationarity_decision_diagram.png)
 
 #### A. Stationary in Variance?
 
@@ -64,19 +64,19 @@ Tested after the variance step using both ACF/PACF behavior and the ADF H0 mecha
 
 **ADF decision:**
 
-- **ADF lag strategy:** Independent analysis: choose the number of lagged differenced terms automatically by AIC, then apply the ADF H0 decision rule.
-- **H0:** gamma = 0, data has a unit root, so data is not stationary in mean.
-- **H1:** gamma < 0, data has no unit root, so data is stationary in mean.
-- **Initial ADF statistic before differencing:** -2.3715
-- **Initial selected lag by AIC:** 3
-- **Final ADF statistic:** -3.9262
-- **Final selected lag by AIC:** 5
-- **Final ADF regression AIC:** 58.7139
+- **ADF test function:** `tseries::adf.test()`
+- **H0:** gamma = 0, series has a unit root, so data is not stationary in mean.
+- **H1:** gamma < 0, series has no unit root, so data is stationary in mean.
+- **Initial ADF statistic before differencing:** -3.2768
+- **Initial selected lag parameter:** 2
+- **Initial ADF p-value:** 0.0875
+- **Final ADF statistic:** -5.2165
+- **Final selected lag parameter:** 2
+- **Final ADF p-value:** 0.0100
 - **Alpha:** 0.05
-- **Critical value at 5%:** -2.86
-- **Decision rule:** reject H0 if ADF statistic < critical value.
+- **Decision rule:** reject H0 if p-value < alpha.
 - **Decision:** Reject H0
-- **Reason:** ADF statistic is smaller/more negative than the critical value.
+- **Reason:** p-value (0.0100) < alpha (0.05).
 - **Conclusion:** modelling series is stationary in mean at 5% significance level.
 - **Treatment:** Differencing applied with d = 1.
 
@@ -139,7 +139,7 @@ Estimated on variance-adjusted series with `d = 1`.
 ```text
   parameter   estimate std_error   z_value      p_value
 1       ar1  0.4649429 0.1395348  3.332094 8.619510e-04
-2       ma1 -0.9999996 0.1276047 -7.836698 4.662937e-15
+2       ma1 -0.9999996 0.1276047 -7.836698 4.625504e-15
 ```
 
 ### 4. Diagnostic Checking IIDN
@@ -148,7 +148,7 @@ Estimated on variance-adjusted series with `d = 1`.
 
 - **Mean residual:** -0.017998
 - **Residual variance:** 0.216416
-- **Independence test, Ljung-Box lag 10 p-value:** 0.7052
+- **Independence test, Ljung-Box lag 7 p-value:** 0.6129
 - **Normality test, Shapiro-Wilk p-value:** 0.0022
 - **IIDN interpretation:** independent if Ljung-Box p-value > 0.05; normally distributed if Shapiro-Wilk p-value > 0.05; identically distributed is checked visually from residual plot and stable residual spread.
 
@@ -165,15 +165,15 @@ Estimated on variance-adjusted series with `d = 1`.
 
 ```text
   period forecast  lower_95 upper_95
-1     46 1.807188 0.8849788 2.729398
-2     47 1.791933 0.7668062 2.817059
-3     48 1.784840 0.7351205 2.834559
-4     49 1.781542 0.7248858 2.838198
-5     50 1.780009 0.7210725 2.838945
-6     51 1.779296 0.7195020 2.839090
-7     52 1.778964 0.7188155 2.839113
-8     53 1.778810 0.7185058 2.839115
-9     54 1.778739 0.7183638 2.839114
+1     46 1.807188 0.8632768 2.751100
+2     47 1.791933 0.7426822 2.841183
+3     48 1.784840 0.7104178 2.859262
+4     49 1.781542 0.7000198 2.863064
+5     50 1.780009 0.6961528 2.863865
+6     51 1.779296 0.6945622 2.864030
+7     52 1.778964 0.6938674 2.864062
+8     53 1.778810 0.6935539 2.864067
+9     54 1.778739 0.6934103 2.864067
 ```
 
 ## Analysis 2: 80:20 Split Modelling and Forecast Test
@@ -187,9 +187,9 @@ Estimated on variance-adjusted series with `d = 1`.
 
 ### 2. Stationarity Check Following the Box-Jenkins Flow
 
-The diagram below summarizes the variance and mean stationarity decisions before the detailed statistical output.
+The diagram below evaluates stationarity before and after differencing using trend and variance line tools alongside ACF and PACF correlograms, aligned with the Box-Jenkins methodology in `docs/ARIMA_Box-Jenkins.pdf`.
 
-![Analysis 2: 80:20 Split Modelling and Forecast Test stationarity decision diagram](plots_rstudio/split_80_20_02_stationarity_decision_diagram.png)
+![Analysis 2: 80:20 Split Modelling and Forecast Test stationarity evaluation diagram](plots_rstudio/split_80_20_02_stationarity_decision_diagram.png)
 
 #### A. Stationary in Variance?
 
@@ -225,19 +225,19 @@ Tested after the variance step using both ACF/PACF behavior and the ADF H0 mecha
 
 **ADF decision:**
 
-- **ADF lag strategy:** Independent analysis: choose the number of lagged differenced terms automatically by AIC, then apply the ADF H0 decision rule.
-- **H0:** gamma = 0, data has a unit root, so data is not stationary in mean.
-- **H1:** gamma < 0, data has no unit root, so data is stationary in mean.
-- **Initial ADF statistic before differencing:** -1.9662
-- **Initial selected lag by AIC:** 4
-- **Final ADF statistic:** -3.2224
-- **Final selected lag by AIC:** 5
-- **Final ADF regression AIC:** 48.9816
+- **ADF test function:** `tseries::adf.test()`
+- **H0:** gamma = 0, series has a unit root, so data is not stationary in mean.
+- **H1:** gamma < 0, series has no unit root, so data is stationary in mean.
+- **Initial ADF statistic before differencing:** -2.3072
+- **Initial selected lag parameter:** 2
+- **Initial ADF p-value:** 0.4536
+- **Final ADF statistic:** -4.3574
+- **Final selected lag parameter:** 2
+- **Final ADF p-value:** 0.0100
 - **Alpha:** 0.05
-- **Critical value at 5%:** -2.86
-- **Decision rule:** reject H0 if ADF statistic < critical value.
+- **Decision rule:** reject H0 if p-value < alpha.
 - **Decision:** Reject H0
-- **Reason:** ADF statistic is smaller/more negative than the critical value.
+- **Reason:** p-value (0.0100) < alpha (0.05).
 - **Conclusion:** modelling series is stationary in mean at 5% significance level.
 - **Treatment:** Differencing applied with d = 1.
 
@@ -312,7 +312,7 @@ Estimated on variance-adjusted series with `d = 1`.
 
 - **Mean residual:** 0.056700
 - **Residual variance:** 0.275057
-- **Independence test, Ljung-Box lag 10 p-value:** 0.9295
+- **Independence test, Ljung-Box lag 6 p-value:** 0.8453
 - **Normality test, Shapiro-Wilk p-value:** 0.0560
 - **IIDN interpretation:** independent if Ljung-Box p-value > 0.05; normally distributed if Shapiro-Wilk p-value > 0.05; identically distributed is checked visually from residual plot and stable residual spread.
 
@@ -331,15 +331,15 @@ Estimated on variance-adjusted series with `d = 1`.
 
 ```text
   period actual forecast  lower_95 upper_95      error absolute_error absolute_percentage_error
-1     37   1.77 2.309222 1.2751220 3.343323 -0.5392223      0.5392223                  30.46454
-2     38   1.61 2.309222 1.1456966 3.472748 -0.6992223      0.6992223                  43.42996
-3     39   1.25 2.309222 1.0292922 3.589152 -1.0592223      1.0592223                  84.73778
-4     40   1.15 2.309222 0.9226258 3.695819 -1.1592223      1.1592223                 100.80194
-5     41   1.37 2.309222 0.8235983 3.794846 -0.9392223      0.9392223                  68.55637
-6     42   1.79 2.309222 0.7307713 3.887673 -0.5192223      0.5192223                  29.00683
-7     43   1.68 2.309222 0.6431082 3.975336 -0.6292223      0.6292223                  37.45371
-8     44   1.78 2.309222 0.5598324 4.058612 -0.5292223      0.5292223                  29.73159
-9     45   1.84 2.309222 0.4803445 4.138100 -0.4692223      0.4692223                  25.50121
+1     37   1.77 2.309222 1.2600248 3.358420 -0.5392223      0.5392223                  30.46454
+2     38   1.61 2.309222 1.1287098 3.489735 -0.6992223      0.6992223                  43.42996
+3     39   1.25 2.309222 1.0106060 3.607839 -1.0592223      1.0592223                  84.73778
+4     40   1.15 2.309222 0.9023824 3.716062 -1.1592223      1.1592223                 100.80194
+5     41   1.37 2.309222 0.8019091 3.816535 -0.9392223      0.9392223                  68.55637
+6     42   1.79 2.309222 0.7077269 3.910718 -0.5192223      0.5192223                  29.00683
+7     43   1.68 2.309222 0.6187839 3.999661 -0.6292223      0.6292223                  37.45371
+8     44   1.78 2.309222 0.5342924 4.084152 -0.5292223      0.5292223                  29.73159
+9     45   1.84 2.309222 0.4536440 4.164801 -0.4692223      0.4692223                  25.50121
 ```
 
 ## Comparison with the Original Book Analysis
