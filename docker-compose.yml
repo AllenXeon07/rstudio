@@ -7,6 +7,13 @@ services:
     environment:
       - PASSWORD=""
       - DISABLE_AUTH=true
+      - USERID=1000
+      - GROUPID=1000
+    command: >
+      bash -lc "mkdir -p /home/rstudio/project/plots_rstudio &&
+      touch /home/rstudio/project/arima_box_jenkins_w1_report.md &&
+      chown -R rstudio:rstudio /home/rstudio/project/plots_rstudio /home/rstudio/project/data /home/rstudio/project/arima_box_jenkins_w1_report.md &&
+      /init"
     volumes:
       - .:/home/rstudio/project
     restart: unless-stopped
