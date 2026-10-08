@@ -10,9 +10,12 @@ services:
       - USERID=1000
       - GROUPID=1000
     command: >
-      bash -lc "mkdir -p /home/rstudio/project/plots_rstudio &&
-      touch /home/rstudio/project/arima_box_jenkins_w1_report.md &&
-      chown -R rstudio:rstudio /home/rstudio/project/plots_rstudio /home/rstudio/project/data /home/rstudio/project/arima_box_jenkins_w1_report.md &&
+      bash -lc "mkdir -p /home/rstudio/project/data /home/rstudio/project/plots_rstudio /home/rstudio/project/docs &&
+      chown rstudio:rstudio /home/rstudio/project &&
+      chown -R rstudio:rstudio /home/rstudio/project/data /home/rstudio/project/plots_rstudio /home/rstudio/project/docs &&
+      chmod a+rwX /home/rstudio/project &&
+      chmod -R a+rwX /home/rstudio/project/data /home/rstudio/project/plots_rstudio /home/rstudio/project/docs &&
+      umask 000 &&
       /init"
     volumes:
       - .:/home/rstudio/project

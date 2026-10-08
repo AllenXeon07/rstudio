@@ -22,13 +22,13 @@ The workflow below follows the ARIMA Box-Jenkins notes in `docs/ARIMA_Box-Jenkin
 
 ### 1. Time Series Plot
 
-![Analysis 1: Full Data Modelling (45 Entries) time series plot](plots_rstudio/full_data_01_timeseries.png)
+![Analysis 1: Full Data Modelling (45 Entries) time series plot](plots_rstudio/w1/full_data_01_timeseries.png)
 
 ### 2. Stationarity Check Following the Box-Jenkins Flow
 
 The diagram below evaluates stationarity before and after differencing using trend and variance line tools alongside ACF and PACF correlograms, aligned with the Box-Jenkins methodology in `docs/ARIMA_Box-Jenkins.pdf`.
 
-![Analysis 1: Full Data Modelling (45 Entries) stationarity evaluation diagram](plots_rstudio/full_data_02_stationarity_decision_diagram.png)
+![Analysis 1: Full Data Modelling (45 Entries) stationarity evaluation diagram](plots_rstudio/w1/full_data_02_stationarity_decision_diagram.png)
 
 #### A. Stationary in Variance?
 
@@ -46,7 +46,7 @@ The diagram below evaluates stationarity before and after differencing using tre
 
 **ACF/PACF note for variance:** ACF and PACF do not directly test stationarity in variance. They are used below for mean-stationarity and model-order diagnosis. Variance stationarity is decided here from the variance comparison and time-series plot.
 
-![Analysis 1: Full Data Modelling (45 Entries) variance stationarity check](plots_rstudio/full_data_02_variance_stationarity_check.png)
+![Analysis 1: Full Data Modelling (45 Entries) variance stationarity check](plots_rstudio/w1/full_data_02_variance_stationarity_check.png)
 
 #### B. Stationary in Mean?
 
@@ -87,7 +87,7 @@ Tested after the variance step using both ACF/PACF behavior and the ADF H0 mecha
 - **Final ADF decision after treatment:** stationary in mean
 - **Final ACF/PACF vs final ADF:** aligned.
 
-![Analysis 1: Full Data Modelling (45 Entries) mean stationarity check](plots_rstudio/full_data_03_mean_stationarity_check.png)
+![Analysis 1: Full Data Modelling (45 Entries) mean stationarity check](plots_rstudio/w1/full_data_03_mean_stationarity_check.png)
 
 #### C. Non-Stationarity Factor Diagnosis
 
@@ -97,7 +97,7 @@ Tested after the variance step using both ACF/PACF behavior and the ADF H0 mecha
 
 #### D. Model Identification (ACF and PACF)
 
-![Analysis 1: Full Data Modelling (45 Entries) ACF and PACF](plots_rstudio/full_data_04_acf_pacf_stationary.png)
+![Analysis 1: Full Data Modelling (45 Entries) ACF and PACF](plots_rstudio/w1/full_data_04_acf_pacf_stationary.png)
 
 - **Significance threshold:** +/- 0.3015, calculated as +/- 2/sqrt(n).
 - **Significant ACF lags:** 1
@@ -122,41 +122,108 @@ Estimated on variance-adjusted series with `d = 1`.
 4 1 1 1
 ```
 
-**Model comparison:**
+**AR(p) lag possibilities:**
+
+The table below estimates pure autoregressive alternatives `ARIMA(p,d,0)` for several lag lengths, using the same differencing order selected in the stationarity step.
 
 ```text
-         model      aic log_likelihood
-1 ARIMA(1,1,1) 66.42686      -30.21343
-2 ARIMA(0,1,1) 67.78699      -31.89350
-3 ARIMA(1,1,0) 69.90138      -32.95069
-4 ARIMA(0,1,0) 73.51215      -35.75608
+         model ar_lags      aic log_likelihood
+1 ARIMA(1,1,0)    1..1 69.90138      -32.95069
+2 ARIMA(2,1,0)    1..2 70.38740      -32.19370
+3 ARIMA(3,1,0)    1..3 71.78151      -31.89075
+4 ARIMA(0,1,0)    none 73.51215      -35.75608
+5 ARIMA(4,1,0)    1..4 73.76992      -31.88496
+6 ARIMA(5,1,0)    1..5 74.74897      -31.37448
+7 ARIMA(6,1,0)    1..6 76.54294      -31.27147
 ```
 
-**Selected model by lowest AIC:** `ARIMA(1,1,1)`
+**Combined model comparison for final decision:**
+
+This table combines the ACF/PACF candidate grid with the extra AR(p) lag possibilities, then evaluates IIDN for every fitted model.
+
+```text
+  fit_index        model      aic log_likelihood ljung_box_p   shapiro_p  iidn_score mean_residual
+1         3 ARIMA(0,1,1) 67.78699      -31.89350   0.7733705 0.064988657 0.064988657    0.02238482
+2         2 ARIMA(1,1,0) 69.90138      -32.95069   0.6642281 0.068253878 0.068253878    0.01826677
+3         5 ARIMA(2,1,0) 70.38740      -32.19370   0.6687429 0.106425133 0.106425133    0.02045447
+4         6 ARIMA(3,1,0) 71.78151      -31.89075   0.5806585 0.068001721 0.068001721    0.02218008
+5         1 ARIMA(0,1,0) 73.51215      -35.75608   0.2634634 0.056476680 0.056476680    0.01424889
+6         7 ARIMA(4,1,0) 73.76992      -31.88496   0.4751621 0.073243089 0.073243089    0.02209054
+7         4 ARIMA(1,1,1) 66.42686      -30.21343   0.7051641 0.002159731 0.002159731   -0.01799832
+8         8 ARIMA(5,1,0) 74.74897      -31.37448   0.4306342 0.025852793 0.025852793    0.02109773
+9         9 ARIMA(6,1,0) 76.54294      -31.27147   0.3521046 0.041736514 0.041736514    0.02148119
+  variance_residual iidn_pass    iidn_decision selection_group
+1         0.2475043      TRUE Pass IIDN checks       IIDN pass
+2         0.2607291      TRUE Pass IIDN checks       IIDN pass
+3         0.2514203      TRUE Pass IIDN checks       IIDN pass
+4         0.2476166      TRUE Pass IIDN checks       IIDN pass
+5         0.2972151      TRUE Pass IIDN checks       IIDN pass
+6         0.2475502      TRUE Pass IIDN checks       IIDN pass
+7         0.2164157     FALSE Fail IIDN checks       IIDN fail
+8         0.2411539     FALSE Fail IIDN checks       IIDN fail
+9         0.2399182     FALSE Fail IIDN checks       IIDN fail
+                                                                                   residual_plot
+1 plots_rstudio/w1/full_data_candidate_model_diagnostics/1_ARIMA_0_1_1__residual_diagnostics.png
+2 plots_rstudio/w1/full_data_candidate_model_diagnostics/2_ARIMA_1_1_0__residual_diagnostics.png
+3 plots_rstudio/w1/full_data_candidate_model_diagnostics/3_ARIMA_2_1_0__residual_diagnostics.png
+4 plots_rstudio/w1/full_data_candidate_model_diagnostics/4_ARIMA_3_1_0__residual_diagnostics.png
+5 plots_rstudio/w1/full_data_candidate_model_diagnostics/5_ARIMA_0_1_0__residual_diagnostics.png
+6 plots_rstudio/w1/full_data_candidate_model_diagnostics/6_ARIMA_4_1_0__residual_diagnostics.png
+7 plots_rstudio/w1/full_data_candidate_model_diagnostics/7_ARIMA_1_1_1__residual_diagnostics.png
+8 plots_rstudio/w1/full_data_candidate_model_diagnostics/8_ARIMA_5_1_0__residual_diagnostics.png
+9 plots_rstudio/w1/full_data_candidate_model_diagnostics/9_ARIMA_6_1_0__residual_diagnostics.png
+```
+
+**Model comparison plot:**
+
+![Analysis 1: Full Data Modelling (45 Entries) model IIDN comparison](plots_rstudio/w1/full_data_05_model_iidn_comparison.png)
+
+**Selected decision model:** `ARIMA(0,1,1)`
+
+- **Selection rule:** evaluate IIDN for every candidate model first, then choose the lowest AIC among models that pass IIDN checks. If no candidate passes IIDN, choose the lowest-AIC fallback and document the diagnostic risk.
+- **Selection result:** Selected as the lowest-AIC model among candidates that pass IIDN checks.
+
+**Final ARIMA model equation:**
+
+General ARIMA form:
+
+$$
+\phi(B) (1 - B)^d Z_t = \theta_0 + \theta(B) a_t
+$$
+
+B: operator backshift (`BZ_t = Z_{t-1}`) - `a_t`: galat white noise - `theta_0`: konstanta.
+
+Estimated model form:
+
+$$
+(1)(1 - B)^{1} Z_t = (1 - 0.4847B^{1})a_t
+$$
+
+- **Decision model:** select `ARIMA(0,1,1)`. Selected as the lowest-AIC model among candidates that pass IIDN checks.
+- **Equation note:** MA signs follow the R forecast::Arima convention, so MA terms appear as plus/minus the estimated ma coefficient on the right side.
 
 **Selected model coefficients:**
 
 ```text
-  parameter   estimate std_error   z_value      p_value
-1       ar1  0.4649429 0.1395348  3.332094 8.619510e-04
-2       ma1 -0.9999996 0.1276047 -7.836698 4.625504e-15
+  parameter   estimate std_error   z_value     p_value
+1       ma1 -0.4847062 0.1682835 -2.880295 0.003973027
 ```
 
 ### 4. Diagnostic Checking IIDN
 
-![Analysis 1: Full Data Modelling (45 Entries) residual diagnostics](plots_rstudio/full_data_05_iidn_diagnostic_checking.png)
+![Analysis 1: Full Data Modelling (45 Entries) residual diagnostics](plots_rstudio/w1/full_data_05_iidn_diagnostic_checking.png)
 
-- **Mean residual:** -0.017998
-- **Residual variance:** 0.216416
-- **Independence test, Ljung-Box lag 7 p-value:** 0.6129
-- **Normality test, Shapiro-Wilk p-value:** 0.0022
+- **Mean residual:** 0.022385
+- **Residual variance:** 0.247504
+- **Independence test, Ljung-Box lag 8 p-value:** 0.6990
+- **Normality test, Shapiro-Wilk p-value:** 0.0650
 - **IIDN interpretation:** independent if Ljung-Box p-value > 0.05; normally distributed if Shapiro-Wilk p-value > 0.05; identically distributed is checked visually from residual plot and stable residual spread.
 
 ### 5. Forecasting
 
-![Analysis 1: Full Data Modelling (45 Entries) forecast](plots_rstudio/full_data_06_forecast.png)
+![Analysis 1: Full Data Modelling (45 Entries) forecast](plots_rstudio/w1/full_data_06_forecast.png)
 
-- **Forecast model:** `ARIMA(1,1,1)`
+- **Forecast model:** `ARIMA(0,1,1)`
 - **Forecast horizon:** 9 periods
 - **Accuracy metrics:** not available because all observations are used for modelling.
 - **Forecast CSV:** `data/truck_manufacturing_defects_w1_full_data_forecast.csv`
@@ -165,15 +232,15 @@ Estimated on variance-adjusted series with `d = 1`.
 
 ```text
   period forecast  lower_95 upper_95
-1     46 1.807188 0.8632768 2.751100
-2     47 1.791933 0.7426822 2.841183
-3     48 1.784840 0.7104178 2.859262
-4     49 1.781542 0.7000198 2.863064
-5     50 1.780009 0.6961528 2.863865
-6     51 1.779296 0.6945622 2.864030
-7     52 1.778964 0.6938674 2.864062
-8     53 1.778810 0.6935539 2.864067
-9     54 1.778739 0.6934103 2.864067
+1     46 1.775724 0.7883343 2.763114
+2     47 1.775724 0.6649533 2.886495
+3     48 1.775724 0.5539692 2.997479
+4     49 1.775724 0.4522596 3.099189
+5     50 1.775724 0.3578272 3.193621
+6     51 1.775724 0.2693029 3.282146
+7     52 1.775724 0.1856996 3.365749
+8     53 1.775724 0.1062777 3.445171
+9     54 1.775724 0.0304664 3.520982
 ```
 
 ## Analysis 2: 80:20 Split Modelling and Forecast Test
@@ -183,13 +250,13 @@ Estimated on variance-adjusted series with `d = 1`.
 
 ### 1. Time Series Plot
 
-![Analysis 2: 80:20 Split Modelling and Forecast Test time series plot](plots_rstudio/split_80_20_01_timeseries.png)
+![Analysis 2: 80:20 Split Modelling and Forecast Test time series plot](plots_rstudio/w1/split_80_20_01_timeseries.png)
 
 ### 2. Stationarity Check Following the Box-Jenkins Flow
 
 The diagram below evaluates stationarity before and after differencing using trend and variance line tools alongside ACF and PACF correlograms, aligned with the Box-Jenkins methodology in `docs/ARIMA_Box-Jenkins.pdf`.
 
-![Analysis 2: 80:20 Split Modelling and Forecast Test stationarity evaluation diagram](plots_rstudio/split_80_20_02_stationarity_decision_diagram.png)
+![Analysis 2: 80:20 Split Modelling and Forecast Test stationarity evaluation diagram](plots_rstudio/w1/split_80_20_02_stationarity_decision_diagram.png)
 
 #### A. Stationary in Variance?
 
@@ -207,7 +274,7 @@ The diagram below evaluates stationarity before and after differencing using tre
 
 **ACF/PACF note for variance:** ACF and PACF do not directly test stationarity in variance. They are used below for mean-stationarity and model-order diagnosis. Variance stationarity is decided here from the variance comparison and time-series plot.
 
-![Analysis 2: 80:20 Split Modelling and Forecast Test variance stationarity check](plots_rstudio/split_80_20_02_variance_stationarity_check.png)
+![Analysis 2: 80:20 Split Modelling and Forecast Test variance stationarity check](plots_rstudio/w1/split_80_20_02_variance_stationarity_check.png)
 
 #### B. Stationary in Mean?
 
@@ -248,7 +315,7 @@ Tested after the variance step using both ACF/PACF behavior and the ADF H0 mecha
 - **Final ADF decision after treatment:** stationary in mean
 - **Final ACF/PACF vs final ADF:** aligned.
 
-![Analysis 2: 80:20 Split Modelling and Forecast Test mean stationarity check](plots_rstudio/split_80_20_03_mean_stationarity_check.png)
+![Analysis 2: 80:20 Split Modelling and Forecast Test mean stationarity check](plots_rstudio/w1/split_80_20_03_mean_stationarity_check.png)
 
 #### C. Non-Stationarity Factor Diagnosis
 
@@ -258,7 +325,7 @@ Tested after the variance step using both ACF/PACF behavior and the ADF H0 mecha
 
 #### D. Model Identification (ACF and PACF)
 
-![Analysis 2: 80:20 Split Modelling and Forecast Test ACF and PACF](plots_rstudio/split_80_20_04_acf_pacf_stationary.png)
+![Analysis 2: 80:20 Split Modelling and Forecast Test ACF and PACF](plots_rstudio/w1/split_80_20_04_acf_pacf_stationary.png)
 
 - **Significance threshold:** +/- 0.3381, calculated as +/- 2/sqrt(n).
 - **Significant ACF lags:** none
@@ -285,19 +352,88 @@ Estimated on variance-adjusted series with `d = 1`.
 6 2 1 1
 ```
 
-**Model comparison:**
+**AR(p) lag possibilities:**
+
+The table below estimates pure autoregressive alternatives `ARIMA(p,d,0)` for several lag lengths, using the same differencing order selected in the stationarity step.
 
 ```text
-         model      aic log_likelihood
-1 ARIMA(0,1,1) 58.83405      -27.41703
-2 ARIMA(1,1,1) 59.38065      -26.69033
-3 ARIMA(2,1,0) 60.53371      -27.26686
-4 ARIMA(1,1,0) 60.80500      -28.40250
-5 ARIMA(0,1,0) 61.97676      -29.98838
-6 ARIMA(2,1,1) 62.38041      -27.19021
+         model ar_lags      aic log_likelihood
+1 ARIMA(2,1,0)    1..2 60.53371      -27.26686
+2 ARIMA(1,1,0)    1..1 60.80500      -28.40250
+3 ARIMA(0,1,0)    none 61.97676      -29.98838
+4 ARIMA(3,1,0)    1..3 62.30867      -27.15433
+5 ARIMA(4,1,0)    1..4 64.07091      -27.03546
+6 ARIMA(5,1,0)    1..5 64.87373      -26.43686
+7 ARIMA(6,1,0)    1..6 65.89830      -25.94915
 ```
 
-**Selected model by lowest AIC:** `ARIMA(0,1,1)`
+**Combined model comparison for final decision:**
+
+This table combines the ACF/PACF candidate grid with the extra AR(p) lag possibilities, then evaluates IIDN for every fitted model.
+
+```text
+   fit_index        model      aic log_likelihood ljung_box_p  shapiro_p iidn_score mean_residual
+1          4 ARIMA(0,1,1) 58.83405      -27.41703   0.9295302 0.05601611 0.05601611    0.05669976
+2          3 ARIMA(2,1,0) 60.53371      -27.26686   0.8866979 0.17661177 0.17661177    0.05528048
+3          2 ARIMA(1,1,0) 60.80500      -28.40250   0.7564512 0.07709558 0.07709558    0.04733230
+4          1 ARIMA(0,1,0) 61.97676      -29.98838   0.6242048 0.17735382 0.17735382    0.04753333
+5          7 ARIMA(3,1,0) 62.30867      -27.15433   0.8464036 0.09025739 0.09025739    0.05769663
+6          6 ARIMA(2,1,1) 62.38041      -27.19021   0.8420645 0.10168305 0.10168305    0.05775107
+7          8 ARIMA(4,1,0) 64.07091      -27.03546   0.7714479 0.09099391 0.09099391    0.05515885
+8         10 ARIMA(6,1,0) 65.89830      -25.94915   0.5789254 0.06443714 0.06443714    0.05107584
+9          5 ARIMA(1,1,1) 59.38065      -26.69033   0.8467778 0.01260808 0.01260808    0.02319700
+10         9 ARIMA(5,1,0) 64.87373      -26.43686   0.6558984 0.03707032 0.03707032    0.05942094
+   variance_residual iidn_pass    iidn_decision selection_group
+1          0.2750574      TRUE Pass IIDN checks       IIDN pass
+2          0.2728647      TRUE Pass IIDN checks       IIDN pass
+3          0.2934386      TRUE Pass IIDN checks       IIDN pass
+4          0.3225704      TRUE Pass IIDN checks       IIDN pass
+5          0.2706831      TRUE Pass IIDN checks       IIDN pass
+6          0.2712959      TRUE Pass IIDN checks       IIDN pass
+7          0.2686956      TRUE Pass IIDN checks       IIDN pass
+8          0.2464394      TRUE Pass IIDN checks       IIDN pass
+9          0.2496986     FALSE Fail IIDN checks       IIDN fail
+10         0.2556346     FALSE Fail IIDN checks       IIDN fail
+                                                                                       residual_plot
+1   plots_rstudio/w1/split_80_20_candidate_model_diagnostics/1_ARIMA_0_1_1__residual_diagnostics.png
+2   plots_rstudio/w1/split_80_20_candidate_model_diagnostics/2_ARIMA_2_1_0__residual_diagnostics.png
+3   plots_rstudio/w1/split_80_20_candidate_model_diagnostics/3_ARIMA_1_1_0__residual_diagnostics.png
+4   plots_rstudio/w1/split_80_20_candidate_model_diagnostics/4_ARIMA_0_1_0__residual_diagnostics.png
+5   plots_rstudio/w1/split_80_20_candidate_model_diagnostics/5_ARIMA_3_1_0__residual_diagnostics.png
+6   plots_rstudio/w1/split_80_20_candidate_model_diagnostics/6_ARIMA_2_1_1__residual_diagnostics.png
+7   plots_rstudio/w1/split_80_20_candidate_model_diagnostics/7_ARIMA_4_1_0__residual_diagnostics.png
+8   plots_rstudio/w1/split_80_20_candidate_model_diagnostics/8_ARIMA_6_1_0__residual_diagnostics.png
+9   plots_rstudio/w1/split_80_20_candidate_model_diagnostics/9_ARIMA_1_1_1__residual_diagnostics.png
+10 plots_rstudio/w1/split_80_20_candidate_model_diagnostics/10_ARIMA_5_1_0__residual_diagnostics.png
+```
+
+**Model comparison plot:**
+
+![Analysis 2: 80:20 Split Modelling and Forecast Test model IIDN comparison](plots_rstudio/w1/split_80_20_05_model_iidn_comparison.png)
+
+**Selected decision model:** `ARIMA(0,1,1)`
+
+- **Selection rule:** evaluate IIDN for every candidate model first, then choose the lowest AIC among models that pass IIDN checks. If no candidate passes IIDN, choose the lowest-AIC fallback and document the diagnostic risk.
+- **Selection result:** Selected as the lowest-AIC model among candidates that pass IIDN checks.
+
+**Final ARIMA model equation:**
+
+General ARIMA form:
+
+$$
+\phi(B) (1 - B)^d Z_t = \theta_0 + \theta(B) a_t
+$$
+
+B: operator backshift (`BZ_t = Z_{t-1}`) - `a_t`: galat white noise - `theta_0`: konstanta.
+
+Estimated model form:
+
+$$
+(1)(1 - B)^{1} Z_t = (1 - 0.4843B^{1})a_t
+$$
+
+- **Decision model:** select `ARIMA(0,1,1)`. Selected as the lowest-AIC model among candidates that pass IIDN checks.
+- **Equation note:** MA signs follow the R forecast::Arima convention, so MA terms appear as plus/minus the estimated ma coefficient on the right side.
 
 **Selected model coefficients:**
 
@@ -308,7 +444,7 @@ Estimated on variance-adjusted series with `d = 1`.
 
 ### 4. Diagnostic Checking IIDN
 
-![Analysis 2: 80:20 Split Modelling and Forecast Test residual diagnostics](plots_rstudio/split_80_20_05_iidn_diagnostic_checking.png)
+![Analysis 2: 80:20 Split Modelling and Forecast Test residual diagnostics](plots_rstudio/w1/split_80_20_05_iidn_diagnostic_checking.png)
 
 - **Mean residual:** 0.056700
 - **Residual variance:** 0.275057
@@ -318,7 +454,7 @@ Estimated on variance-adjusted series with `d = 1`.
 
 ### 5. Forecasting
 
-![Analysis 2: 80:20 Split Modelling and Forecast Test forecast](plots_rstudio/split_80_20_06_forecast.png)
+![Analysis 2: 80:20 Split Modelling and Forecast Test forecast](plots_rstudio/w1/split_80_20_06_forecast.png)
 
 - **Forecast model:** `ARIMA(0,1,1)`
 - **Forecast horizon:** 9 periods
@@ -374,7 +510,7 @@ The significance flags below use the rule `abs(estimate) > 2 * St.E.`.
 ### Our Independent Analysis Result
 
 - Our independent workflow applies formal variance testing and ADF testing with lag selection by AIC.
-- Our full-data selected model is `ARIMA(1,1,1)`.
+- Our full-data selected model is `ARIMA(0,1,1)`.
 - Our 80:20 split selected model is `ARIMA(0,1,1)`.
 - 80:20 split accuracy: MAE = 0.7270, RMSE = 0.7669, MAPE = 49.96%.
 
