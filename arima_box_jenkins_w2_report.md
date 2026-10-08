@@ -70,9 +70,47 @@ Tested after the variance step using both ACF/PACF behavior and the ADF H0 mecha
 - **Initial ADF statistic before differencing:** -11.8437
 - **Initial selected lag parameter:** 2
 - **Initial ADF p-value:** 0.0100
+
+**ADF lag sensitivity before differencing:**
+
+Several ADF lag parameters are tested because the unit-root decision can change when lagged differences are added to absorb autocorrelation.
+
+```text
+   lag_k adf_statistic    p_value          decision             conclusion
+1      0     -5.514201 0.01000000         Reject H0     stationary in mean
+2      1    -12.516865 0.01000000         Reject H0     stationary in mean
+3      2    -11.843719 0.01000000         Reject H0     stationary in mean
+4      3     -9.546310 0.01000000         Reject H0     stationary in mean
+5      4     -8.545871 0.01000000         Reject H0     stationary in mean
+6      5     -6.586686 0.01000000         Reject H0     stationary in mean
+7      6     -5.015926 0.01000000         Reject H0     stationary in mean
+8      7     -3.834503 0.01767287         Reject H0     stationary in mean
+9      8     -2.941860 0.17930209 Fail to reject H0 not stationary in mean
+10     9     -2.928990 0.18472668 Fail to reject H0 not stationary in mean
+11    10     -2.902272 0.19598836 Fail to reject H0 not stationary in mean
+```
+
 - **Final ADF statistic:** -12.7172
 - **Final selected lag parameter:** 2
 - **Final ADF p-value:** 0.0100
+
+**ADF lag sensitivity after treatment:**
+
+```text
+   lag_k adf_statistic p_value  decision         conclusion
+1      0     -17.91296    0.01 Reject H0 stationary in mean
+2      1     -12.74035    0.01 Reject H0 stationary in mean
+3      2     -12.71715    0.01 Reject H0 stationary in mean
+4      3     -11.86890    0.01 Reject H0 stationary in mean
+5      4     -12.11617    0.01 Reject H0 stationary in mean
+6      5     -13.03932    0.01 Reject H0 stationary in mean
+7      6     -13.73174    0.01 Reject H0 stationary in mean
+8      7     -16.70805    0.01 Reject H0 stationary in mean
+9      8     -15.95542    0.01 Reject H0 stationary in mean
+10     9     -14.43252    0.01 Reject H0 stationary in mean
+11    10     -13.32944    0.01 Reject H0 stationary in mean
+```
+
 - **Alpha:** 0.05
 - **Decision rule:** reject H0 if p-value < alpha.
 - **Decision:** Reject H0
@@ -376,9 +414,47 @@ Tested after the variance step using both ACF/PACF behavior and the ADF H0 mecha
 - **Initial ADF statistic before differencing:** -9.6987
 - **Initial selected lag parameter:** 2
 - **Initial ADF p-value:** 0.0100
+
+**ADF lag sensitivity before differencing:**
+
+Several ADF lag parameters are tested because the unit-root decision can change when lagged differences are added to absorb autocorrelation.
+
+```text
+   lag_k adf_statistic    p_value          decision             conclusion
+1      0     -4.946084 0.01000000         Reject H0     stationary in mean
+2      1    -10.578803 0.01000000         Reject H0     stationary in mean
+3      2     -9.698695 0.01000000         Reject H0     stationary in mean
+4      3     -8.066891 0.01000000         Reject H0     stationary in mean
+5      4     -7.496353 0.01000000         Reject H0     stationary in mean
+6      5     -5.673321 0.01000000         Reject H0     stationary in mean
+7      6     -4.639445 0.01000000         Reject H0     stationary in mean
+8      7     -3.598198 0.03403718         Reject H0     stationary in mean
+9      8     -3.164615 0.09445312 Fail to reject H0 not stationary in mean
+10     9     -2.977735 0.16460506 Fail to reject H0 not stationary in mean
+11    10     -2.754460 0.25851670 Fail to reject H0 not stationary in mean
+```
+
 - **Final ADF statistic:** -11.8216
 - **Final selected lag parameter:** 2
 - **Final ADF p-value:** 0.0100
+
+**ADF lag sensitivity after treatment:**
+
+```text
+   lag_k adf_statistic p_value  decision         conclusion
+1      0     -16.16137    0.01 Reject H0 stationary in mean
+2      1     -11.94291    0.01 Reject H0 stationary in mean
+3      2     -11.82155    0.01 Reject H0 stationary in mean
+4      3     -10.39841    0.01 Reject H0 stationary in mean
+5      4     -10.71631    0.01 Reject H0 stationary in mean
+6      5     -11.14142    0.01 Reject H0 stationary in mean
+7      6     -12.39741    0.01 Reject H0 stationary in mean
+8      7     -13.04962    0.01 Reject H0 stationary in mean
+9      8     -12.25961    0.01 Reject H0 stationary in mean
+10     9     -12.98824    0.01 Reject H0 stationary in mean
+11    10     -11.48520    0.01 Reject H0 stationary in mean
+```
+
 - **Alpha:** 0.05
 - **Decision rule:** reject H0 if p-value < alpha.
 - **Decision:** Reject H0

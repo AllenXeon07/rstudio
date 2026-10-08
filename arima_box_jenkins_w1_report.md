@@ -70,9 +70,41 @@ Tested after the variance step using both ACF/PACF behavior and the ADF H0 mecha
 - **Initial ADF statistic before differencing:** -3.2768
 - **Initial selected lag parameter:** 2
 - **Initial ADF p-value:** 0.0875
+
+**ADF lag sensitivity before differencing:**
+
+Several ADF lag parameters are tested because the unit-root decision can change when lagged differences are added to absorb autocorrelation.
+
+```text
+  lag_k adf_statistic    p_value          decision             conclusion
+1     0     -4.488057 0.01000000         Reject H0     stationary in mean
+2     1     -3.520877 0.05047369 Fail to reject H0 not stationary in mean
+3     2     -3.276806 0.08749908 Fail to reject H0 not stationary in mean
+4     3     -2.549718 0.35577555 Fail to reject H0 not stationary in mean
+5     4     -2.903513 0.21540845 Fail to reject H0 not stationary in mean
+6     5     -2.495395 0.37732808 Fail to reject H0 not stationary in mean
+7     6     -2.887113 0.22191507 Fail to reject H0 not stationary in mean
+8     7     -2.541683 0.35896337 Fail to reject H0 not stationary in mean
+```
+
 - **Final ADF statistic:** -5.2165
 - **Final selected lag parameter:** 2
 - **Final ADF p-value:** 0.0100
+
+**ADF lag sensitivity after treatment:**
+
+```text
+  lag_k adf_statistic    p_value          decision             conclusion
+1     0     -9.145797 0.01000000         Reject H0     stationary in mean
+2     1     -6.155057 0.01000000         Reject H0     stationary in mean
+3     2     -5.216465 0.01000000         Reject H0     stationary in mean
+4     3     -3.668124 0.03884361         Reject H0     stationary in mean
+5     4     -3.694538 0.03674064         Reject H0     stationary in mean
+6     5     -3.875592 0.02364696         Reject H0     stationary in mean
+7     6     -3.787033 0.02937637         Reject H0     stationary in mean
+8     7     -3.174295 0.10890933 Fail to reject H0 not stationary in mean
+```
+
 - **Alpha:** 0.05
 - **Decision rule:** reject H0 if p-value < alpha.
 - **Decision:** Reject H0
@@ -298,9 +330,41 @@ Tested after the variance step using both ACF/PACF behavior and the ADF H0 mecha
 - **Initial ADF statistic before differencing:** -2.3072
 - **Initial selected lag parameter:** 2
 - **Initial ADF p-value:** 0.4536
+
+**ADF lag sensitivity before differencing:**
+
+Several ADF lag parameters are tested because the unit-root decision can change when lagged differences are added to absorb autocorrelation.
+
+```text
+  lag_k adf_statistic    p_value          decision             conclusion
+1     0    -3.4466196 0.06647971 Fail to reject H0 not stationary in mean
+2     1    -2.7773567 0.27067832 Fail to reject H0 not stationary in mean
+3     2    -2.3071807 0.45362618 Fail to reject H0 not stationary in mean
+4     3    -1.4384131 0.79166804 Fail to reject H0 not stationary in mean
+5     4    -1.8461957 0.63299778 Fail to reject H0 not stationary in mean
+6     5    -0.9873407 0.92600291 Fail to reject H0 not stationary in mean
+7     6    -1.1041795 0.90840670 Fail to reject H0 not stationary in mean
+8     7    -0.4617421 0.97804586 Fail to reject H0 not stationary in mean
+```
+
 - **Final ADF statistic:** -4.3574
 - **Final selected lag parameter:** 2
 - **Final ADF p-value:** 0.0100
+
+**ADF lag sensitivity after treatment:**
+
+```text
+  lag_k adf_statistic    p_value          decision             conclusion
+1     0     -6.777561 0.01000000         Reject H0     stationary in mean
+2     1     -5.441966 0.01000000         Reject H0     stationary in mean
+3     2     -4.357409 0.01000000         Reject H0     stationary in mean
+4     3     -2.821564 0.25408125 Fail to reject H0 not stationary in mean
+5     4     -3.178499 0.11549262 Fail to reject H0 not stationary in mean
+6     5     -3.856531 0.02797208         Reject H0     stationary in mean
+7     6     -3.234207 0.09771314 Fail to reject H0 not stationary in mean
+8     7     -3.007684 0.18181573 Fail to reject H0 not stationary in mean
+```
+
 - **Alpha:** 0.05
 - **Decision rule:** reject H0 if p-value < alpha.
 - **Decision:** Reject H0

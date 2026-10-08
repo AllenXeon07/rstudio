@@ -139,6 +139,31 @@ adf_stationarity_check <- function(x, alpha = 0.05, k = NULL) {
   )
 }
 
+adf_lag_sensitivity <- function(x, alpha = 0.05, max_lag = NULL) {
+  values <- as.numeric(x)
+  if (is.null(max_lag)) {
+    max_lag <- min(10, max(2, trunc((length(values) - 1)^(1/3)) + 4))
+  }
+  lag_values <- 0:max_lag
+  rows <- lapply(lag_values, function(k) {
+    test <- tseries::adf.test(values, alternative = "stationary", k = k)
+    p_value <- test$p.value
+    reject_h0 <- p_value < alpha
+
+    data.frame(
+      lag_k = k,
+      adf_statistic = as.numeric(test$statistic),
+      p_value = p_value,
+      decision = if (reject_h0) "Reject H0" else "Fail to reject H0",
+      conclusion = if (reject_h0) "stationary in mean" else "not stationary in mean"
+    )
+  })
+
+  table <- do.call(rbind, rows)
+  rownames(table) <- NULL
+  table
+}
+
 safe_arima <- function(x, order) {
   tryCatch(
     forecast::Arima(x, order = order, method = "ML"),
@@ -831,6 +856,7 @@ run_box_jenkins_analysis <- function(label, model_data, test_data = NULL, prefix
   adf_lag_strategy <- "Standard Augmented Dickey-Fuller test via tseries::adf.test() with p-value decision rule."
   mean_acf_pacf_before_difference <- diagnose_mean_stationarity_from_acf_pacf(variance_adjusted_ts)
   adf_result_before_difference <- adf_stationarity_check(variance_adjusted_ts)
+  adf_lag_sensitivity_before_difference <- adf_lag_sensitivity(variance_adjusted_ts)
   mean_initially_stationary <- adf_result_before_difference$reject_h0 && mean_acf_pacf_before_difference$stationary
   difference_order <- 0
   stationary_ts <- variance_adjusted_ts
@@ -849,6 +875,7 @@ run_box_jenkins_analysis <- function(label, model_data, test_data = NULL, prefix
   if (!(adf_result$reject_h0 && mean_acf_pacf_current$stationary)) {
     mean_treatment <- paste(mean_treatment, "Series is still not stationary in mean after d = 2.")
   }
+  adf_lag_sensitivity_final <- adf_lag_sensitivity(stationary_ts)
   mean_acf_pacf_final <- mean_acf_pacf_current
   initial_stationarity_alignment <- mean_acf_pacf_before_difference$stationary == adf_result_before_difference$reject_h0
   final_stationarity_alignment <- mean_acf_pacf_final$stationary == adf_result$reject_h0
@@ -1130,6 +1157,8 @@ run_box_jenkins_analysis <- function(label, model_data, test_data = NULL, prefix
     variance_treatment = variance_treatment,
     adf_result_before_difference = adf_result_before_difference,
     adf_lag_strategy = adf_lag_strategy,
+    adf_lag_sensitivity_before_difference = adf_lag_sensitivity_before_difference,
+    adf_lag_sensitivity_final = adf_lag_sensitivity_final,
     mean_acf_pacf_before_difference = mean_acf_pacf_before_difference,
     mean_acf_pacf_final = mean_acf_pacf_final,
     initial_stationarity_alignment = initial_stationarity_alignment,
@@ -1208,9 +1237,14 @@ write_analysis_section <- function(result) {
   cat(sprintf("- **Initial ADF statistic before differencing:** %.4f\n", result$adf_result_before_difference$statistic))
   cat(sprintf("- **Initial selected lag parameter:** %s\n", result$adf_result_before_difference$selected_lag))
   cat(sprintf("- **Initial ADF p-value:** %.4f\n", result$adf_result_before_difference$p_value))
+  cat("\n**ADF lag sensitivity before differencing:**\n\n")
+  cat("Several ADF lag parameters are tested because the unit-root decision can change when lagged differences are added to absorb autocorrelation.\n\n")
+  write_data_frame_block(result$adf_lag_sensitivity_before_difference)
   cat(sprintf("- **Final ADF statistic:** %.4f\n", result$adf_result$statistic))
   cat(sprintf("- **Final selected lag parameter:** %s\n", result$adf_result$selected_lag))
   cat(sprintf("- **Final ADF p-value:** %.4f\n", result$adf_result$p_value))
+  cat("\n**ADF lag sensitivity after treatment:**\n\n")
+  write_data_frame_block(result$adf_lag_sensitivity_final)
   cat(sprintf("- **Alpha:** %.2f\n", result$adf_result$alpha))
   cat("- **Decision rule:** reject H0 if p-value < alpha.\n")
   cat("- **Decision:** ", result$adf_result$decision, "\n", sep = "")
