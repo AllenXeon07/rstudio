@@ -1,6 +1,6 @@
 # Time Series Analysis of Truck Manufacturing Defects W1
 
-- **Project root:** `/home/rstudio/project`
+- **Project root:** `/home/rstudio/project/Week1`
 - **Data source:** `data/truck_manufacturing_defects_w1.csv`
 - **Book comparison source:** `data/w1_book_acf_pacf.csv`
 - **Total observations:** 45
@@ -174,26 +174,26 @@ The table below estimates pure autoregressive alternatives `ARIMA(p,d,0)` for se
 This table combines the ACF/PACF candidate grid with the extra AR(p) lag possibilities, then evaluates IIDN for every fitted model.
 
 ```text
-  fit_index        model      aic log_likelihood ljung_box_p   shapiro_p  iidn_score mean_residual
-1         3 ARIMA(0,1,1) 67.78699      -31.89350   0.7733705 0.064988657 0.064988657    0.02238482
-2         2 ARIMA(1,1,0) 69.90138      -32.95069   0.6642281 0.068253878 0.068253878    0.01826677
-3         5 ARIMA(2,1,0) 70.38740      -32.19370   0.6687429 0.106425133 0.106425133    0.02045447
-4         6 ARIMA(3,1,0) 71.78151      -31.89075   0.5806585 0.068001721 0.068001721    0.02218008
-5         1 ARIMA(0,1,0) 73.51215      -35.75608   0.2634634 0.056476680 0.056476680    0.01424889
-6         7 ARIMA(4,1,0) 73.76992      -31.88496   0.4751621 0.073243089 0.073243089    0.02209054
-7         4 ARIMA(1,1,1) 66.42686      -30.21343   0.7051641 0.002159731 0.002159731   -0.01799832
-8         8 ARIMA(5,1,0) 74.74897      -31.37448   0.4306342 0.025852793 0.025852793    0.02109773
-9         9 ARIMA(6,1,0) 76.54294      -31.27147   0.3521046 0.041736514 0.041736514    0.02148119
-  variance_residual iidn_pass    iidn_decision selection_group
-1         0.2475043      TRUE Pass IIDN checks       IIDN pass
-2         0.2607291      TRUE Pass IIDN checks       IIDN pass
-3         0.2514203      TRUE Pass IIDN checks       IIDN pass
-4         0.2476166      TRUE Pass IIDN checks       IIDN pass
-5         0.2972151      TRUE Pass IIDN checks       IIDN pass
-6         0.2475502      TRUE Pass IIDN checks       IIDN pass
-7         0.2164157     FALSE Fail IIDN checks       IIDN fail
-8         0.2411539     FALSE Fail IIDN checks       IIDN fail
-9         0.2399182     FALSE Fail IIDN checks       IIDN fail
+  fit_index        model      aic log_likelihood ljung_box_p   shapiro_p  iidn_score mean_residual variance_residual
+1         3 ARIMA(0,1,1) 67.78699      -31.89350   0.7733705 0.064988657 0.064988657    0.02238482         0.2475043
+2         2 ARIMA(1,1,0) 69.90138      -32.95069   0.6642281 0.068253878 0.068253878    0.01826677         0.2607291
+3         5 ARIMA(2,1,0) 70.38740      -32.19370   0.6687429 0.106425133 0.106425133    0.02045447         0.2514203
+4         6 ARIMA(3,1,0) 71.78151      -31.89075   0.5806585 0.068001721 0.068001721    0.02218008         0.2476166
+5         1 ARIMA(0,1,0) 73.51215      -35.75608   0.2634634 0.056476680 0.056476680    0.01424889         0.2972151
+6         7 ARIMA(4,1,0) 73.76992      -31.88496   0.4751621 0.073243089 0.073243089    0.02209054         0.2475502
+7         4 ARIMA(1,1,1) 66.42686      -30.21343   0.7051641 0.002159731 0.002159731   -0.01799832         0.2164157
+8         8 ARIMA(5,1,0) 74.74897      -31.37448   0.4306342 0.025852793 0.025852793    0.02109773         0.2411539
+9         9 ARIMA(6,1,0) 76.54294      -31.27147   0.3521046 0.041736514 0.041736514    0.02148119         0.2399182
+  iidn_pass    iidn_decision selection_group
+1      TRUE Pass IIDN checks       IIDN pass
+2      TRUE Pass IIDN checks       IIDN pass
+3      TRUE Pass IIDN checks       IIDN pass
+4      TRUE Pass IIDN checks       IIDN pass
+5      TRUE Pass IIDN checks       IIDN pass
+6      TRUE Pass IIDN checks       IIDN pass
+7     FALSE Fail IIDN checks       IIDN fail
+8     FALSE Fail IIDN checks       IIDN fail
+9     FALSE Fail IIDN checks       IIDN fail
                                                                                    residual_plot
 1 plots_rstudio/w1/full_data_candidate_model_diagnostics/1_ARIMA_0_1_1__residual_diagnostics.png
 2 plots_rstudio/w1/full_data_candidate_model_diagnostics/2_ARIMA_1_1_0__residual_diagnostics.png
@@ -436,28 +436,28 @@ The table below estimates pure autoregressive alternatives `ARIMA(p,d,0)` for se
 This table combines the ACF/PACF candidate grid with the extra AR(p) lag possibilities, then evaluates IIDN for every fitted model.
 
 ```text
-   fit_index        model      aic log_likelihood ljung_box_p  shapiro_p iidn_score mean_residual
-1          4 ARIMA(0,1,1) 58.83405      -27.41703   0.9295302 0.05601611 0.05601611    0.05669976
-2          3 ARIMA(2,1,0) 60.53371      -27.26686   0.8866979 0.17661177 0.17661177    0.05528048
-3          2 ARIMA(1,1,0) 60.80500      -28.40250   0.7564512 0.07709558 0.07709558    0.04733230
-4          1 ARIMA(0,1,0) 61.97676      -29.98838   0.6242048 0.17735382 0.17735382    0.04753333
-5          7 ARIMA(3,1,0) 62.30867      -27.15433   0.8464036 0.09025739 0.09025739    0.05769663
-6          6 ARIMA(2,1,1) 62.38041      -27.19021   0.8420645 0.10168305 0.10168305    0.05775107
-7          8 ARIMA(4,1,0) 64.07091      -27.03546   0.7714479 0.09099391 0.09099391    0.05515885
-8         10 ARIMA(6,1,0) 65.89830      -25.94915   0.5789254 0.06443714 0.06443714    0.05107584
-9          5 ARIMA(1,1,1) 59.38065      -26.69033   0.8467778 0.01260808 0.01260808    0.02319700
-10         9 ARIMA(5,1,0) 64.87373      -26.43686   0.6558984 0.03707032 0.03707032    0.05942094
-   variance_residual iidn_pass    iidn_decision selection_group
-1          0.2750574      TRUE Pass IIDN checks       IIDN pass
-2          0.2728647      TRUE Pass IIDN checks       IIDN pass
-3          0.2934386      TRUE Pass IIDN checks       IIDN pass
-4          0.3225704      TRUE Pass IIDN checks       IIDN pass
-5          0.2706831      TRUE Pass IIDN checks       IIDN pass
-6          0.2712959      TRUE Pass IIDN checks       IIDN pass
-7          0.2686956      TRUE Pass IIDN checks       IIDN pass
-8          0.2464394      TRUE Pass IIDN checks       IIDN pass
-9          0.2496986     FALSE Fail IIDN checks       IIDN fail
-10         0.2556346     FALSE Fail IIDN checks       IIDN fail
+   fit_index        model      aic log_likelihood ljung_box_p  shapiro_p iidn_score mean_residual variance_residual
+1          4 ARIMA(0,1,1) 58.83405      -27.41703   0.9295302 0.05601611 0.05601611    0.05669976         0.2750574
+2          3 ARIMA(2,1,0) 60.53371      -27.26686   0.8866979 0.17661177 0.17661177    0.05528048         0.2728647
+3          2 ARIMA(1,1,0) 60.80500      -28.40250   0.7564512 0.07709558 0.07709558    0.04733230         0.2934386
+4          1 ARIMA(0,1,0) 61.97676      -29.98838   0.6242048 0.17735382 0.17735382    0.04753333         0.3225704
+5          7 ARIMA(3,1,0) 62.30867      -27.15433   0.8464036 0.09025739 0.09025739    0.05769663         0.2706831
+6          6 ARIMA(2,1,1) 62.38041      -27.19021   0.8420645 0.10168305 0.10168305    0.05775107         0.2712959
+7          8 ARIMA(4,1,0) 64.07091      -27.03546   0.7714479 0.09099391 0.09099391    0.05515885         0.2686956
+8         10 ARIMA(6,1,0) 65.89830      -25.94915   0.5789254 0.06443714 0.06443714    0.05107584         0.2464394
+9          5 ARIMA(1,1,1) 59.38065      -26.69033   0.8467778 0.01260808 0.01260808    0.02319700         0.2496986
+10         9 ARIMA(5,1,0) 64.87373      -26.43686   0.6558984 0.03707032 0.03707032    0.05942094         0.2556346
+   iidn_pass    iidn_decision selection_group
+1       TRUE Pass IIDN checks       IIDN pass
+2       TRUE Pass IIDN checks       IIDN pass
+3       TRUE Pass IIDN checks       IIDN pass
+4       TRUE Pass IIDN checks       IIDN pass
+5       TRUE Pass IIDN checks       IIDN pass
+6       TRUE Pass IIDN checks       IIDN pass
+7       TRUE Pass IIDN checks       IIDN pass
+8       TRUE Pass IIDN checks       IIDN pass
+9      FALSE Fail IIDN checks       IIDN fail
+10     FALSE Fail IIDN checks       IIDN fail
                                                                                        residual_plot
 1   plots_rstudio/w1/split_80_20_candidate_model_diagnostics/1_ARIMA_0_1_1__residual_diagnostics.png
 2   plots_rstudio/w1/split_80_20_candidate_model_diagnostics/2_ARIMA_2_1_0__residual_diagnostics.png

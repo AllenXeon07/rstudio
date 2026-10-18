@@ -1,10 +1,15 @@
-args <- commandArgs(trailingOnly = FALSE)
-file_arg <- "--file="
-script_path <- sub(file_arg, "", args[grepl(file_arg, args)])
-project_dir <- if (length(script_path) > 0) dirname(normalizePath(script_path)) else getwd()
+script_args <- commandArgs(trailingOnly = FALSE)
+script_file <- sub("--file=", "", script_args[grepl("--file=", script_args)])
+project_dir <- if (length(script_file) > 0 && nchar(script_file) > 0) {
+  normalizePath(dirname(script_file), mustWork = FALSE)
+} else if (dir.exists("/home/rstudio/project/Week1")) {
+  "/home/rstudio/project/Week1"
+} else {
+  getwd()
+}
 
 data_path <- file.path(project_dir, "data", "truck_manufacturing_defects_w1.csv")
-output_dir <- file.path(project_dir, "plots")
+output_dir <- file.path(project_dir, "plots_rstudio", "w1")
 
 truck_defects <- read.csv(data_path)
 

@@ -1,6 +1,6 @@
 # Time Series Analysis of Wolf Yearly Sunspot Numbers W2
 
-- **Project root:** `/home/rstudio/project`
+- **Project root:** `/home/rstudio/project/Week1`
 - **Data source:** `data/wolf_yearly_sunspot_numbers_w2.csv`
 - **Plot output directory:** `plots_rstudio/w2`
 - **Total observations:** 302
