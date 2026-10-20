@@ -10,7 +10,8 @@ ENV PASSWORD=""
 RUN install2.r --error --skipinstalled \
     forecast \
     tseries \
-    lmtest
+    lmtest \
+    gstar
 
 # Expose the RStudio port
 EXPOSE 8787
