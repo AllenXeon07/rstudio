@@ -8,7 +8,9 @@ The first 326 rows are training data and the final 82 rows are the untouched 20%
 2. Build inverse-distance spatial weights.
 3. Plot raw training data and check variance/mean stationarity.
 4. Apply Box–Cox only if variance is non-stationary; difference only if mean remains non-stationary.
-5. Fit GSTAR candidates, diagnose residuals, then evaluate the untouched test data.
+5. Use station-level ACF/PACF to propose several GSTAR temporal orders; fit and diagnose those candidates.
+6. If none of the suggested orders passes the full IIDN diagnostic, return to identification and evaluate the remaining lags through the identification limit.
+7. Evaluate the selected model on the untouched test data.
 
 ## 1. Coordinates, distances, and spatial weights
 
@@ -156,26 +158,85 @@ Raw variance was tested before transformation. Box–Cox is used only when varia
 | raw_training_reused | Perak1 | KPSS | NA | 0.029102 | 0.100000 | TRUE |
 | raw_training_reused | Perak2 | KPSS | NA | 0.029182 | 0.100000 | TRUE |
 
-## 4. Iterative GSTAR candidate identification
+## 4. ACF/PACF identification and diagnostic iteration
 
-Temporal orders p = 1 through p = 12 were fitted in a loop. Every candidate has separate parameter estimates, IIDN diagnostics, and residual cross-location correlations below. A fully IIDN candidate must have p-values of at least 0.05 for mean-zero, normality, variance stability, and both Ljung–Box tests at every location. If no full-IIDN candidate exists, the script selects the lowest-AIC candidate that passes the white-noise checks; otherwise it records the lowest-AIC finite-coefficient fallback.
+ACF/PACF are calculated separately for each station on the model-scale series, to lag 12. Any statistically significant ACF or PACF lag (95% approximate bounds), plus p = 1, is an initial GSTAR-order suggestion. Suggested orders: **1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12**.
+
+### GSTAR(a,b) notation used in this report
+
+Following the course convention, `a` is the maximum temporal lag from other locations through the spatial-weight matrix, and `b` is the maximum temporal lag from the same location. The `gstar` package fits both effect types for every temporal lag from 1 through its single argument `p`; therefore each package candidate `p` is reported here as **GSTAR(a = p, b = p)**. The separate `d` column is the differencing order, not a spatial or temporal lag.
+
+Every suggested candidate has separate parameter estimates, IIDN diagnostics, and residual cross-location correlations below. A fully IIDN candidate must have p-values of at least 0.05 for mean-zero, normality, variance stability, and both Ljung–Box tests at every location. If none of the ACF/PACF suggestions passes the full IIDN checks, the model-identification cycle is repeated by evaluating the remaining lags up to the identification limit. If no full-IIDN candidate exists, the script selects the lowest-AIC candidate that passes the white-noise checks; otherwise it records the lowest-AIC finite-coefficient fallback.
+
+### ACF/PACF values and order suggestions
+
+| location | lag | acf | pacf | significance_bound | acf_significant | pacf_significant |
+|---|---|---|---|---|---|---|
+| Juanda | 1 | 0.603473 | 0.603473 | 0.108552 | TRUE | TRUE |
+| Juanda | 2 | 0.267822 | -0.151548 | 0.108552 | TRUE | TRUE |
+| Juanda | 3 | -0.036944 | -0.211851 | 0.108552 | FALSE | TRUE |
+| Juanda | 4 | -0.311169 | -0.265745 | 0.108552 | TRUE | TRUE |
+| Juanda | 5 | -0.497419 | -0.251991 | 0.108552 | TRUE | TRUE |
+| Juanda | 6 | -0.569150 | -0.240752 | 0.108552 | TRUE | TRUE |
+| Juanda | 7 | -0.486671 | -0.155122 | 0.108552 | TRUE | TRUE |
+| Juanda | 8 | -0.305613 | -0.130753 | 0.108552 | TRUE | TRUE |
+| Juanda | 9 | -0.040784 | -0.025074 | 0.108552 | FALSE | FALSE |
+| Juanda | 10 | 0.225210 | 0.026356 | 0.108552 | TRUE | FALSE |
+| Juanda | 11 | 0.469385 | 0.160047 | 0.108552 | TRUE | TRUE |
+| Juanda | 12 | 0.633147 | 0.264640 | 0.108552 | TRUE | TRUE |
+| Perak1 | 1 | 0.409885 | 0.409885 | 0.108552 | TRUE | TRUE |
+| Perak1 | 2 | 0.225810 | 0.069477 | 0.108552 | TRUE | FALSE |
+| Perak1 | 3 | -0.047893 | -0.196256 | 0.108552 | FALSE | TRUE |
+| Perak1 | 4 | -0.241630 | -0.219648 | 0.108552 | TRUE | TRUE |
+| Perak1 | 5 | -0.365854 | -0.208045 | 0.108552 | TRUE | TRUE |
+| Perak1 | 6 | -0.354173 | -0.124507 | 0.108552 | TRUE | TRUE |
+| Perak1 | 7 | -0.384714 | -0.241748 | 0.108552 | TRUE | TRUE |
+| Perak1 | 8 | -0.247547 | -0.133160 | 0.108552 | TRUE | TRUE |
+| Perak1 | 9 | 0.018609 | 0.092645 | 0.108552 | FALSE | FALSE |
+| Perak1 | 10 | 0.184266 | 0.048500 | 0.108552 | TRUE | FALSE |
+| Perak1 | 11 | 0.399161 | 0.178716 | 0.108552 | TRUE | TRUE |
+| Perak1 | 12 | 0.509287 | 0.247776 | 0.108552 | TRUE | TRUE |
+| Perak2 | 1 | 0.610202 | 0.610202 | 0.108552 | TRUE | TRUE |
+| Perak2 | 2 | 0.321279 | -0.081361 | 0.108552 | TRUE | FALSE |
+| Perak2 | 3 | -0.024292 | -0.299344 | 0.108552 | FALSE | TRUE |
+| Perak2 | 4 | -0.322356 | -0.284654 | 0.108552 | TRUE | TRUE |
+| Perak2 | 5 | -0.516168 | -0.236572 | 0.108552 | TRUE | TRUE |
+| Perak2 | 6 | -0.588763 | -0.220222 | 0.108552 | TRUE | TRUE |
+| Perak2 | 7 | -0.538558 | -0.212316 | 0.108552 | TRUE | TRUE |
+| Perak2 | 8 | -0.327636 | -0.071584 | 0.108552 | TRUE | FALSE |
+| Perak2 | 9 | -0.025484 | 0.046125 | 0.108552 | FALSE | FALSE |
+| Perak2 | 10 | 0.293425 | 0.134797 | 0.108552 | TRUE | TRUE |
+| Perak2 | 11 | 0.527590 | 0.153128 | 0.108552 | TRUE | TRUE |
+| Perak2 | 12 | 0.676699 | 0.280505 | 0.108552 | TRUE | TRUE |
+
+### Juanda
+
+![ACF/PACF - Juanda](plots_rstudio/02_acf_pacf_juanda.png)
+
+### Perak1
+
+![ACF/PACF - Perak1](plots_rstudio/02_acf_pacf_perak1.png)
+
+### Perak2
+
+![ACF/PACF - Perak2](plots_rstudio/02_acf_pacf_perak2.png)
 
 ### Candidate summary and selection flags
 
-| p | d | fitted | AIC | coefficients_finite | min_ljung_box_p | error | min_mean_zero_p | min_normality_p | min_variance_stability_p | min_ljung_box_10_p | min_ljung_box_20_p | iidn_pass | white_noise_pass |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 1 | 0 | TRUE | 12043.21 | TRUE | 0.000000 |  | 0.000000 | 0 | 0.377841 | 0.000000 | 0.000000 | FALSE | FALSE |
-| 2 | 0 | TRUE | 11959.55 | TRUE | 0.000000 |  | 0.000030 | 0 | 0.436659 | 0.000000 | 0.000000 | FALSE | FALSE |
-| 3 | 0 | TRUE | 11902.38 | TRUE | 0.000000 |  | 0.000021 | 0 | 0.335697 | 0.001372 | 0.000000 | FALSE | FALSE |
-| 4 | 0 | TRUE | 11857.66 | TRUE | 0.000000 |  | 0.000056 | 0 | 0.309158 | 0.004099 | 0.000000 | FALSE | FALSE |
-| 5 | 0 | TRUE | 11822.62 | TRUE | 0.000000 |  | 0.000599 | 0 | 0.300742 | 0.000765 | 0.000000 | FALSE | FALSE |
-| 6 | 0 | TRUE | 11762.50 | TRUE | 0.000001 |  | 0.004125 | 0 | 0.286386 | 0.002078 | 0.000001 | FALSE | FALSE |
-| 7 | 0 | TRUE | 11700.79 | TRUE | 0.000001 |  | 0.012244 | 0 | 0.330467 | 0.003349 | 0.000001 | FALSE | FALSE |
-| 8 | 0 | TRUE | 11641.16 | TRUE | 0.000000 |  | 0.041040 | 0 | 0.361655 | 0.003220 | 0.000000 | FALSE | FALSE |
-| 9 | 0 | TRUE | 11548.07 | TRUE | 0.000000 |  | 0.118629 | 0 | 0.343787 | 0.000049 | 0.000000 | FALSE | FALSE |
-| 10 | 0 | TRUE | 11460.16 | TRUE | 0.000002 |  | 0.241931 | 0 | 0.298879 | 0.000432 | 0.000002 | FALSE | FALSE |
-| 11 | 0 | TRUE | 11365.36 | TRUE | 0.000226 |  | 0.396373 | 0 | 0.311128 | 0.237792 | 0.000226 | FALSE | FALSE |
-| 12 | 0 | TRUE | 11248.74 | TRUE | 0.397463 |  | 0.551223 | 0 | 0.295936 | 0.955636 | 0.397463 | FALSE | TRUE |
+| p | spatial_lag_order_a | own_lag_order_b | identification_round | d | fitted | AIC | coefficients_finite | min_ljung_box_p | error | min_mean_zero_p | min_normality_p | min_variance_stability_p | min_ljung_box_10_p | min_ljung_box_20_p | iidn_pass | white_noise_pass |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | 1 | 1 | ACF/PACF suggestion | 0 | TRUE | 12043.21 | TRUE | 0.000000 |  | 0.000000 | 0 | 0.377841 | 0.000000 | 0.000000 | FALSE | FALSE |
+| 2 | 2 | 2 | ACF/PACF suggestion | 0 | TRUE | 11959.55 | TRUE | 0.000000 |  | 0.000030 | 0 | 0.436659 | 0.000000 | 0.000000 | FALSE | FALSE |
+| 3 | 3 | 3 | ACF/PACF suggestion | 0 | TRUE | 11902.38 | TRUE | 0.000000 |  | 0.000021 | 0 | 0.335697 | 0.001372 | 0.000000 | FALSE | FALSE |
+| 4 | 4 | 4 | ACF/PACF suggestion | 0 | TRUE | 11857.66 | TRUE | 0.000000 |  | 0.000056 | 0 | 0.309158 | 0.004099 | 0.000000 | FALSE | FALSE |
+| 5 | 5 | 5 | ACF/PACF suggestion | 0 | TRUE | 11822.62 | TRUE | 0.000000 |  | 0.000599 | 0 | 0.300742 | 0.000765 | 0.000000 | FALSE | FALSE |
+| 6 | 6 | 6 | ACF/PACF suggestion | 0 | TRUE | 11762.50 | TRUE | 0.000001 |  | 0.004125 | 0 | 0.286386 | 0.002078 | 0.000001 | FALSE | FALSE |
+| 7 | 7 | 7 | ACF/PACF suggestion | 0 | TRUE | 11700.79 | TRUE | 0.000001 |  | 0.012244 | 0 | 0.330467 | 0.003349 | 0.000001 | FALSE | FALSE |
+| 8 | 8 | 8 | ACF/PACF suggestion | 0 | TRUE | 11641.16 | TRUE | 0.000000 |  | 0.041040 | 0 | 0.361655 | 0.003220 | 0.000000 | FALSE | FALSE |
+| 10 | 10 | 10 | ACF/PACF suggestion | 0 | TRUE | 11460.16 | TRUE | 0.000002 |  | 0.241931 | 0 | 0.298879 | 0.000432 | 0.000002 | FALSE | FALSE |
+| 11 | 11 | 11 | ACF/PACF suggestion | 0 | TRUE | 11365.36 | TRUE | 0.000226 |  | 0.396373 | 0 | 0.311128 | 0.237792 | 0.000226 | FALSE | FALSE |
+| 12 | 12 | 12 | ACF/PACF suggestion | 0 | TRUE | 11248.74 | TRUE | 0.397463 |  | 0.551223 | 0 | 0.295936 | 0.955636 | 0.397463 | FALSE | TRUE |
+| 9 | 9 | 9 | diagnostic-driven re-identification | 0 | TRUE | 11548.07 | TRUE | 0.000000 |  | 0.118629 | 0 | 0.343787 | 0.000049 | 0.000000 | FALSE | FALSE |
 
 ### All candidate parameter estimates
 
@@ -397,60 +458,6 @@ Temporal orders p = 1 through p = 12 were fitted in a loop. Every candidate has 
 | 8 | psi81(Juanda) | 0.186626 | 27.562845 | 0.006771 | 0.994599 |
 | 8 | psi81(Perak1) | 0.271834 | 6.980390 | 0.038943 | 0.968944 |
 | 8 | psi81(Perak2) | 0.104699 | 5.377437 | 0.019470 | 0.984470 |
-| 9 | psi10(Juanda) | 0.488974 | 3.360109 | 0.145523 | 0.884329 |
-| 9 | psi10(Perak1) | -0.103230 | 7.409656 | -0.013932 | 0.988887 |
-| 9 | psi10(Perak2) | 0.513520 | 12.845927 | 0.039975 | 0.968121 |
-| 9 | psi20(Juanda) | -0.068569 | 3.831508 | -0.017896 | 0.985725 |
-| 9 | psi20(Perak1) | 0.163542 | 7.193968 | 0.022733 | 0.981868 |
-| 9 | psi20(Perak2) | 0.056276 | 14.211617 | 0.003960 | 0.996841 |
-| 9 | psi30(Juanda) | -0.003403 | 3.765138 | -0.000904 | 0.999279 |
-| 9 | psi30(Perak1) | 0.107645 | 7.148254 | 0.015059 | 0.987988 |
-| 9 | psi30(Perak2) | -0.146312 | 14.227986 | -0.010283 | 0.991797 |
-| 9 | psi40(Juanda) | -0.177505 | 3.670365 | -0.048362 | 0.961438 |
-| 9 | psi40(Perak1) | 0.207143 | 6.763573 | 0.030626 | 0.975574 |
-| 9 | psi40(Perak2) | -0.160452 | 14.227040 | -0.011278 | 0.991004 |
-| 9 | psi50(Juanda) | -0.079010 | 3.684838 | -0.021442 | 0.982898 |
-| 9 | psi50(Perak1) | 0.149486 | 7.100242 | 0.021054 | 0.983207 |
-| 9 | psi50(Perak2) | -0.061257 | 14.253291 | -0.004298 | 0.996572 |
-| 9 | psi60(Juanda) | -0.055374 | 3.687376 | -0.015017 | 0.988022 |
-| 9 | psi60(Perak1) | 0.084895 | 7.153466 | 0.011868 | 0.990534 |
-| 9 | psi60(Perak2) | -0.161702 | 14.195965 | -0.011391 | 0.990914 |
-| 9 | psi70(Juanda) | 0.165240 | 3.709097 | 0.044550 | 0.964476 |
-| 9 | psi70(Perak1) | -0.187708 | 7.093128 | -0.026463 | 0.978893 |
-| 9 | psi70(Perak2) | -0.183346 | 14.053676 | -0.013046 | 0.989594 |
-| 9 | psi80(Juanda) | 0.003476 | 3.824832 | 0.000909 | 0.999275 |
-| 9 | psi80(Perak1) | -0.104118 | 7.211336 | -0.014438 | 0.988483 |
-| 9 | psi80(Perak2) | 0.009306 | 14.078777 | 0.000661 | 0.999473 |
-| 9 | psi90(Juanda) | 0.099545 | 3.575781 | 0.027839 | 0.977797 |
-| 9 | psi90(Perak1) | 0.125805 | 7.167137 | 0.017553 | 0.985999 |
-| 9 | psi90(Perak2) | 0.084429 | 13.352992 | 0.006323 | 0.994956 |
-| 9 | psi11(Juanda) | 0.564624 | 27.636143 | 0.020431 | 0.983704 |
-| 9 | psi11(Perak1) | 0.464130 | 5.972920 | 0.077706 | 0.938079 |
-| 9 | psi11(Perak2) | 0.047262 | 5.343436 | 0.008845 | 0.992945 |
-| 9 | psi21(Juanda) | 0.445291 | 27.791341 | 0.016023 | 0.987220 |
-| 9 | psi21(Perak1) | 0.028145 | 7.707697 | 0.003652 | 0.997087 |
-| 9 | psi21(Perak2) | 0.098706 | 5.600864 | 0.017623 | 0.985943 |
-| 9 | psi31(Juanda) | -0.067548 | 28.136610 | -0.002401 | 0.998085 |
-| 9 | psi31(Perak1) | -0.068671 | 7.655168 | -0.008971 | 0.992845 |
-| 9 | psi31(Perak2) | 0.062329 | 5.620206 | 0.011090 | 0.991154 |
-| 9 | psi41(Juanda) | 0.518255 | 27.719693 | 0.018696 | 0.985087 |
-| 9 | psi41(Perak1) | -0.211123 | 7.333295 | -0.028790 | 0.977038 |
-| 9 | psi41(Perak2) | 0.053992 | 5.570542 | 0.009692 | 0.992269 |
-| 9 | psi51(Juanda) | 0.222690 | 27.906647 | 0.007980 | 0.993635 |
-| 9 | psi51(Perak1) | -0.201249 | 7.555049 | -0.026638 | 0.978754 |
-| 9 | psi51(Perak2) | 0.014458 | 5.514748 | 0.002622 | 0.997909 |
-| 9 | psi61(Juanda) | 0.062947 | 27.455004 | 0.002293 | 0.998171 |
-| 9 | psi61(Perak1) | 0.004683 | 7.630110 | 0.000614 | 0.999510 |
-| 9 | psi61(Perak2) | 0.090961 | 5.516682 | 0.016488 | 0.986848 |
-| 9 | psi71(Juanda) | -0.759236 | 27.161829 | -0.027952 | 0.977706 |
-| 9 | psi71(Perak1) | 0.154959 | 7.662340 | 0.020223 | 0.983869 |
-| 9 | psi71(Perak2) | 0.038535 | 5.549958 | 0.006943 | 0.994462 |
-| 9 | psi81(Juanda) | -0.055831 | 27.530525 | -0.002028 | 0.998382 |
-| 9 | psi81(Perak1) | 0.143568 | 7.723944 | 0.018587 | 0.985174 |
-| 9 | psi81(Perak2) | 0.003401 | 5.541395 | 0.000614 | 0.999510 |
-| 9 | psi91(Juanda) | 0.448730 | 25.657253 | 0.017489 | 0.986050 |
-| 9 | psi91(Perak1) | 0.154239 | 6.756197 | 0.022829 | 0.981791 |
-| 9 | psi91(Perak2) | 0.150812 | 5.073231 | 0.029727 | 0.976291 |
 | 10 | psi10(Juanda) | 0.490528 | 3.145023 | 0.155970 | 0.876090 |
 | 10 | psi10(Perak1) | -0.130509 | 7.112323 | -0.018350 | 0.985364 |
 | 10 | psi10(Perak2) | 0.459121 | 12.179454 | 0.037696 | 0.969938 |
@@ -649,6 +656,60 @@ Temporal orders p = 1 through p = 12 were fitted in a loop. Every candidate has 
 | 12 | psi121(Juanda) | 0.465942 | 23.500366 | 0.019827 | 0.984186 |
 | 12 | psi121(Perak1) | 0.091552 | 5.742199 | 0.015944 | 0.987283 |
 | 12 | psi121(Perak2) | 0.107243 | 4.226335 | 0.025375 | 0.979761 |
+| 9 | psi10(Juanda) | 0.488974 | 3.360109 | 0.145523 | 0.884329 |
+| 9 | psi10(Perak1) | -0.103230 | 7.409656 | -0.013932 | 0.988887 |
+| 9 | psi10(Perak2) | 0.513520 | 12.845927 | 0.039975 | 0.968121 |
+| 9 | psi20(Juanda) | -0.068569 | 3.831508 | -0.017896 | 0.985725 |
+| 9 | psi20(Perak1) | 0.163542 | 7.193968 | 0.022733 | 0.981868 |
+| 9 | psi20(Perak2) | 0.056276 | 14.211617 | 0.003960 | 0.996841 |
+| 9 | psi30(Juanda) | -0.003403 | 3.765138 | -0.000904 | 0.999279 |
+| 9 | psi30(Perak1) | 0.107645 | 7.148254 | 0.015059 | 0.987988 |
+| 9 | psi30(Perak2) | -0.146312 | 14.227986 | -0.010283 | 0.991797 |
+| 9 | psi40(Juanda) | -0.177505 | 3.670365 | -0.048362 | 0.961438 |
+| 9 | psi40(Perak1) | 0.207143 | 6.763573 | 0.030626 | 0.975574 |
+| 9 | psi40(Perak2) | -0.160452 | 14.227040 | -0.011278 | 0.991004 |
+| 9 | psi50(Juanda) | -0.079010 | 3.684838 | -0.021442 | 0.982898 |
+| 9 | psi50(Perak1) | 0.149486 | 7.100242 | 0.021054 | 0.983207 |
+| 9 | psi50(Perak2) | -0.061257 | 14.253291 | -0.004298 | 0.996572 |
+| 9 | psi60(Juanda) | -0.055374 | 3.687376 | -0.015017 | 0.988022 |
+| 9 | psi60(Perak1) | 0.084895 | 7.153466 | 0.011868 | 0.990534 |
+| 9 | psi60(Perak2) | -0.161702 | 14.195965 | -0.011391 | 0.990914 |
+| 9 | psi70(Juanda) | 0.165240 | 3.709097 | 0.044550 | 0.964476 |
+| 9 | psi70(Perak1) | -0.187708 | 7.093128 | -0.026463 | 0.978893 |
+| 9 | psi70(Perak2) | -0.183346 | 14.053676 | -0.013046 | 0.989594 |
+| 9 | psi80(Juanda) | 0.003476 | 3.824832 | 0.000909 | 0.999275 |
+| 9 | psi80(Perak1) | -0.104118 | 7.211336 | -0.014438 | 0.988483 |
+| 9 | psi80(Perak2) | 0.009306 | 14.078777 | 0.000661 | 0.999473 |
+| 9 | psi90(Juanda) | 0.099545 | 3.575781 | 0.027839 | 0.977797 |
+| 9 | psi90(Perak1) | 0.125805 | 7.167137 | 0.017553 | 0.985999 |
+| 9 | psi90(Perak2) | 0.084429 | 13.352992 | 0.006323 | 0.994956 |
+| 9 | psi11(Juanda) | 0.564624 | 27.636143 | 0.020431 | 0.983704 |
+| 9 | psi11(Perak1) | 0.464130 | 5.972920 | 0.077706 | 0.938079 |
+| 9 | psi11(Perak2) | 0.047262 | 5.343436 | 0.008845 | 0.992945 |
+| 9 | psi21(Juanda) | 0.445291 | 27.791341 | 0.016023 | 0.987220 |
+| 9 | psi21(Perak1) | 0.028145 | 7.707697 | 0.003652 | 0.997087 |
+| 9 | psi21(Perak2) | 0.098706 | 5.600864 | 0.017623 | 0.985943 |
+| 9 | psi31(Juanda) | -0.067548 | 28.136610 | -0.002401 | 0.998085 |
+| 9 | psi31(Perak1) | -0.068671 | 7.655168 | -0.008971 | 0.992845 |
+| 9 | psi31(Perak2) | 0.062329 | 5.620206 | 0.011090 | 0.991154 |
+| 9 | psi41(Juanda) | 0.518255 | 27.719693 | 0.018696 | 0.985087 |
+| 9 | psi41(Perak1) | -0.211123 | 7.333295 | -0.028790 | 0.977038 |
+| 9 | psi41(Perak2) | 0.053992 | 5.570542 | 0.009692 | 0.992269 |
+| 9 | psi51(Juanda) | 0.222690 | 27.906647 | 0.007980 | 0.993635 |
+| 9 | psi51(Perak1) | -0.201249 | 7.555049 | -0.026638 | 0.978754 |
+| 9 | psi51(Perak2) | 0.014458 | 5.514748 | 0.002622 | 0.997909 |
+| 9 | psi61(Juanda) | 0.062947 | 27.455004 | 0.002293 | 0.998171 |
+| 9 | psi61(Perak1) | 0.004683 | 7.630110 | 0.000614 | 0.999510 |
+| 9 | psi61(Perak2) | 0.090961 | 5.516682 | 0.016488 | 0.986848 |
+| 9 | psi71(Juanda) | -0.759236 | 27.161829 | -0.027952 | 0.977706 |
+| 9 | psi71(Perak1) | 0.154959 | 7.662340 | 0.020223 | 0.983869 |
+| 9 | psi71(Perak2) | 0.038535 | 5.549958 | 0.006943 | 0.994462 |
+| 9 | psi81(Juanda) | -0.055831 | 27.530525 | -0.002028 | 0.998382 |
+| 9 | psi81(Perak1) | 0.143568 | 7.723944 | 0.018587 | 0.985174 |
+| 9 | psi81(Perak2) | 0.003401 | 5.541395 | 0.000614 | 0.999510 |
+| 9 | psi91(Juanda) | 0.448730 | 25.657253 | 0.017489 | 0.986050 |
+| 9 | psi91(Perak1) | 0.154239 | 6.756197 | 0.022829 | 0.981791 |
+| 9 | psi91(Perak2) | 0.150812 | 5.073231 | 0.029727 | 0.976291 |
 
 ### All candidate IIDN diagnostics
 
@@ -678,9 +739,6 @@ Temporal orders p = 1 through p = 12 were fitted in a loop. Every candidate has 
 | 8 | Juanda | 14.637691 | 16189.433 | 0.041040 | 0.000000 | 0.380564 | 0.035951 | 0.001666 |
 | 8 | Perak1 | 8.216435 | 8839.205 | 0.120126 | 0.002386 | 0.361655 | 0.020768 | 0.109329 |
 | 8 | Perak2 | 8.660759 | 6299.508 | 0.052553 | 0.000235 | 0.771267 | 0.003220 | 0.000000 |
-| 9 | Juanda | 10.905746 | 15397.436 | 0.118629 | 0.000000 | 0.994233 | 0.034048 | 0.012873 |
-| 9 | Perak1 | 5.428621 | 8152.864 | 0.285236 | 0.003256 | 0.343787 | 0.320122 | 0.574958 |
-| 9 | Perak2 | 5.684829 | 5743.797 | 0.182670 | 0.024681 | 0.642639 | 0.000049 | 0.000000 |
 | 10 | Juanda | 7.886838 | 14300.709 | 0.241931 | 0.000000 | 0.950615 | 0.039087 | 0.089574 |
 | 10 | Perak1 | 4.146145 | 7877.372 | 0.406931 | 0.002817 | 0.298879 | 0.481379 | 0.844978 |
 | 10 | Perak2 | 3.797271 | 5284.057 | 0.353804 | 0.009490 | 0.985369 | 0.000432 | 0.000002 |
@@ -690,6 +748,9 @@ Temporal orders p = 1 through p = 12 were fitted in a loop. Every candidate has 
 | 12 | Juanda | 3.629301 | 11621.102 | 0.551223 | 0.000000 | 0.295936 | 0.955636 | 0.739403 |
 | 12 | Perak1 | 2.358141 | 7342.320 | 0.626131 | 0.000054 | 0.630355 | 0.998798 | 0.959813 |
 | 12 | Perak2 | 1.147492 | 4178.568 | 0.753307 | 0.000029 | 0.361564 | 0.981805 | 0.397463 |
+| 9 | Juanda | 10.905746 | 15397.436 | 0.118629 | 0.000000 | 0.994233 | 0.034048 | 0.012873 |
+| 9 | Perak1 | 5.428621 | 8152.864 | 0.285236 | 0.003256 | 0.343787 | 0.320122 | 0.574958 |
+| 9 | Perak2 | 5.684829 | 5743.797 | 0.182670 | 0.024681 | 0.642639 | 0.000049 | 0.000000 |
 
 ### All candidate residual cross-location correlations
 
@@ -767,15 +828,6 @@ Temporal orders p = 1 through p = 12 were fitted in a loop. Every candidate has 
 | 8 | Juanda | Perak2 | 0.558986 |
 | 8 | Perak1 | Perak2 | 0.652387 |
 | 8 | Perak2 | Perak2 | 1.000000 |
-| 9 | Juanda | Juanda | 1.000000 |
-| 9 | Perak1 | Juanda | 0.535042 |
-| 9 | Perak2 | Juanda | 0.551698 |
-| 9 | Juanda | Perak1 | 0.535042 |
-| 9 | Perak1 | Perak1 | 1.000000 |
-| 9 | Perak2 | Perak1 | 0.649981 |
-| 9 | Juanda | Perak2 | 0.551698 |
-| 9 | Perak1 | Perak2 | 0.649981 |
-| 9 | Perak2 | Perak2 | 1.000000 |
 | 10 | Juanda | Juanda | 1.000000 |
 | 10 | Perak1 | Juanda | 0.524388 |
 | 10 | Perak2 | Juanda | 0.530826 |
@@ -803,10 +855,19 @@ Temporal orders p = 1 through p = 12 were fitted in a loop. Every candidate has 
 | 12 | Juanda | Perak2 | 0.481590 |
 | 12 | Perak1 | Perak2 | 0.653072 |
 | 12 | Perak2 | Perak2 | 1.000000 |
+| 9 | Juanda | Juanda | 1.000000 |
+| 9 | Perak1 | Juanda | 0.535042 |
+| 9 | Perak2 | Juanda | 0.551698 |
+| 9 | Juanda | Perak1 | 0.535042 |
+| 9 | Perak1 | Perak1 | 1.000000 |
+| 9 | Perak2 | Perak1 | 0.649981 |
+| 9 | Juanda | Perak2 | 0.551698 |
+| 9 | Perak1 | Perak2 | 0.649981 |
+| 9 | Perak2 | Perak2 | 1.000000 |
 
 ## 5. Selected GSTAR model
 
-Selected temporal order: **p = 12**; differencing order: **d = 0**.
+Selected model: **GSTAR(12, 12)**; package temporal order: **p = 12**; differencing order: **d = 0**.
 
 ### All parameter estimates
 
@@ -884,6 +945,135 @@ Selected temporal order: **p = 12**; differencing order: **d = 0**.
 | psi121(Juanda) | 0.465942 | 23.500366 | 0.019827 | 0.984186 |
 | psi121(Perak1) | 0.091552 | 5.742199 | 0.015944 | 0.987283 |
 | psi121(Perak2) | 0.107243 | 4.226335 | 0.025375 | 0.979761 |
+
+### Final equations by location
+
+For the selected GSTAR(12, 12), every own-city term uses lags 1 through b = 12 and every weighted other-city term uses lags 1 through a = 12. Following the paper's presentation, each equation expands the row-standardized spatial lag into separate terms for the other stations. The equation is on the model scale (Z = raw rainfall here; a Box–Cox-transformed Y or first difference would be labelled if used).
+
+### Juanda
+
+$$ Z_{\text{Juanda},t} = 0.362556 Z_{\text{Juanda},t-1} + 0.027978 Z_{\text{Perak1},t-1} + 0.026628 Z_{\text{Perak2},t-1} + 0.002504 Z_{\text{Juanda},t-2} - 0.000154 Z_{\text{Perak1},t-2} - 0.000146 Z_{\text{Perak2},t-2} + 0.110665 Z_{\text{Juanda},t-3} - 0.152408 Z_{\text{Perak1},t-3} - 0.145056 Z_{\text{Perak2},t-3} - 0.053288 Z_{\text{Juanda},t-4} + 0.150928 Z_{\text{Perak1},t-4} + 0.143647 Z_{\text{Perak2},t-4} - 0.034090 Z_{\text{Juanda},t-5} + 0.060249 Z_{\text{Perak1},t-5} + 0.057343 Z_{\text{Perak2},t-5} - 0.098338 Z_{\text{Juanda},t-6} + 0.062477 Z_{\text{Perak1},t-6} + 0.059463 Z_{\text{Perak2},t-6} + 0.112893 Z_{\text{Juanda},t-7} - 0.253647 Z_{\text{Perak1},t-7} - 0.241411 Z_{\text{Perak2},t-7} + 0.028421 Z_{\text{Juanda},t-8} - 0.128586 Z_{\text{Perak1},t-8} - 0.122383 Z_{\text{Perak2},t-8} + 0.086768 Z_{\text{Juanda},t-9} - 0.065694 Z_{\text{Perak1},t-9} - 0.062525 Z_{\text{Perak2},t-9} - 0.060972 Z_{\text{Juanda},t-10} + 0.192942 Z_{\text{Perak1},t-10} + 0.183634 Z_{\text{Perak2},t-10} - 0.051619 Z_{\text{Juanda},t-11} + 0.321466 Z_{\text{Perak1},t-11} + 0.305958 Z_{\text{Perak2},t-11} + 0.207949 Z_{\text{Juanda},t-12} + 0.238730 Z_{\text{Perak1},t-12} + 0.227213 Z_{\text{Perak2},t-12} + \varepsilon_{\text{Juanda},t}. $$
+
+### Perak1
+
+$$ Z_{\text{Perak1},t} = -0.106924 Z_{\text{Perak1},t-1} + 0.091178 Z_{\text{Juanda},t-1} + 0.241500 Z_{\text{Perak2},t-1} + 0.073316 Z_{\text{Perak1},t-2} + 0.014824 Z_{\text{Juanda},t-2} + 0.039264 Z_{\text{Perak2},t-2} + 0.015381 Z_{\text{Perak1},t-3} - 0.004698 Z_{\text{Juanda},t-3} - 0.012444 Z_{\text{Perak2},t-3} + 0.098333 Z_{\text{Perak1},t-4} - 0.028988 Z_{\text{Juanda},t-4} - 0.076779 Z_{\text{Perak2},t-4} + 0.104354 Z_{\text{Perak1},t-5} - 0.039515 Z_{\text{Juanda},t-5} - 0.104662 Z_{\text{Perak2},t-5} + 0.054752 Z_{\text{Perak1},t-6} + 0.008074 Z_{\text{Juanda},t-6} + 0.021385 Z_{\text{Perak2},t-6} - 0.130541 Z_{\text{Perak1},t-7} + 0.030980 Z_{\text{Juanda},t-7} + 0.082055 Z_{\text{Perak2},t-7} - 0.099071 Z_{\text{Perak1},t-8} + 0.032187 Z_{\text{Juanda},t-8} + 0.085251 Z_{\text{Perak2},t-8} + 0.105851 Z_{\text{Perak1},t-9} + 0.012600 Z_{\text{Juanda},t-9} + 0.033373 Z_{\text{Perak2},t-9} - 0.063698 Z_{\text{Perak1},t-10} + 0.034439 Z_{\text{Juanda},t-10} + 0.091216 Z_{\text{Perak2},t-10} + 0.083872 Z_{\text{Perak1},t-11} + 0.000816 Z_{\text{Juanda},t-11} + 0.002160 Z_{\text{Perak2},t-11} + 0.134472 Z_{\text{Perak1},t-12} + 0.025092 Z_{\text{Juanda},t-12} + 0.066460 Z_{\text{Perak2},t-12} + \varepsilon_{\text{Perak1},t}. $$
+
+### Perak2
+
+$$ Z_{\text{Perak2},t} = 0.317674 Z_{\text{Perak2},t-1} - 0.007650 Z_{\text{Juanda},t-1} - 0.021289 Z_{\text{Perak1},t-1} + 0.016838 Z_{\text{Perak2},t-2} + 0.013147 Z_{\text{Juanda},t-2} + 0.036586 Z_{\text{Perak1},t-2} - 0.097076 Z_{\text{Perak2},t-3} + 0.011121 Z_{\text{Juanda},t-3} + 0.030950 Z_{\text{Perak1},t-3} - 0.093225 Z_{\text{Perak2},t-4} + 0.009226 Z_{\text{Juanda},t-4} + 0.025676 Z_{\text{Perak1},t-4} - 0.005682 Z_{\text{Perak2},t-5} - 0.000914 Z_{\text{Juanda},t-5} - 0.002544 Z_{\text{Perak1},t-5} - 0.054736 Z_{\text{Perak2},t-6} + 0.007456 Z_{\text{Juanda},t-6} + 0.020750 Z_{\text{Perak1},t-6} - 0.172778 Z_{\text{Perak2},t-7} + 0.019938 Z_{\text{Juanda},t-7} + 0.055485 Z_{\text{Perak1},t-7} - 0.079264 Z_{\text{Perak2},t-8} + 0.007642 Z_{\text{Juanda},t-8} + 0.021268 Z_{\text{Perak1},t-8} - 0.090437 Z_{\text{Perak2},t-9} + 0.026687 Z_{\text{Juanda},t-9} + 0.074266 Z_{\text{Perak1},t-9} + 0.081059 Z_{\text{Perak2},t-10} - 0.000094 Z_{\text{Juanda},t-10} - 0.000263 Z_{\text{Perak1},t-10} + 0.014305 Z_{\text{Perak2},t-11} + 0.022298 Z_{\text{Juanda},t-11} + 0.062054 Z_{\text{Perak1},t-11} + 0.222128 Z_{\text{Perak2},t-12} + 0.028349 Z_{\text{Juanda},t-12} + 0.078894 Z_{\text{Perak1},t-12} + \varepsilon_{\text{Perak2},t}. $$
+
+### Expanded equation terms
+
+| location | lag | source_location | effect | parameter | spatial_weight | coefficient |
+|---|---|---|---|---|---|---|
+| Juanda | 1 | Juanda | own temporal | psi10(Juanda) | 1.000000 | 0.362556 |
+| Juanda | 1 | Perak1 | spatial weighted | psi11(Juanda) | 0.512359 | 0.027978 |
+| Juanda | 1 | Perak2 | spatial weighted | psi11(Juanda) | 0.487641 | 0.026628 |
+| Juanda | 2 | Juanda | own temporal | psi20(Juanda) | 1.000000 | 0.002504 |
+| Juanda | 2 | Perak1 | spatial weighted | psi21(Juanda) | 0.512359 | -0.000154 |
+| Juanda | 2 | Perak2 | spatial weighted | psi21(Juanda) | 0.487641 | -0.000146 |
+| Juanda | 3 | Juanda | own temporal | psi30(Juanda) | 1.000000 | 0.110665 |
+| Juanda | 3 | Perak1 | spatial weighted | psi31(Juanda) | 0.512359 | -0.152408 |
+| Juanda | 3 | Perak2 | spatial weighted | psi31(Juanda) | 0.487641 | -0.145056 |
+| Juanda | 4 | Juanda | own temporal | psi40(Juanda) | 1.000000 | -0.053288 |
+| Juanda | 4 | Perak1 | spatial weighted | psi41(Juanda) | 0.512359 | 0.150928 |
+| Juanda | 4 | Perak2 | spatial weighted | psi41(Juanda) | 0.487641 | 0.143647 |
+| Juanda | 5 | Juanda | own temporal | psi50(Juanda) | 1.000000 | -0.034090 |
+| Juanda | 5 | Perak1 | spatial weighted | psi51(Juanda) | 0.512359 | 0.060249 |
+| Juanda | 5 | Perak2 | spatial weighted | psi51(Juanda) | 0.487641 | 0.057343 |
+| Juanda | 6 | Juanda | own temporal | psi60(Juanda) | 1.000000 | -0.098338 |
+| Juanda | 6 | Perak1 | spatial weighted | psi61(Juanda) | 0.512359 | 0.062477 |
+| Juanda | 6 | Perak2 | spatial weighted | psi61(Juanda) | 0.487641 | 0.059463 |
+| Juanda | 7 | Juanda | own temporal | psi70(Juanda) | 1.000000 | 0.112893 |
+| Juanda | 7 | Perak1 | spatial weighted | psi71(Juanda) | 0.512359 | -0.253647 |
+| Juanda | 7 | Perak2 | spatial weighted | psi71(Juanda) | 0.487641 | -0.241411 |
+| Juanda | 8 | Juanda | own temporal | psi80(Juanda) | 1.000000 | 0.028421 |
+| Juanda | 8 | Perak1 | spatial weighted | psi81(Juanda) | 0.512359 | -0.128586 |
+| Juanda | 8 | Perak2 | spatial weighted | psi81(Juanda) | 0.487641 | -0.122383 |
+| Juanda | 9 | Juanda | own temporal | psi90(Juanda) | 1.000000 | 0.086768 |
+| Juanda | 9 | Perak1 | spatial weighted | psi91(Juanda) | 0.512359 | -0.065694 |
+| Juanda | 9 | Perak2 | spatial weighted | psi91(Juanda) | 0.487641 | -0.062525 |
+| Juanda | 10 | Juanda | own temporal | psi100(Juanda) | 1.000000 | -0.060972 |
+| Juanda | 10 | Perak1 | spatial weighted | psi101(Juanda) | 0.512359 | 0.192942 |
+| Juanda | 10 | Perak2 | spatial weighted | psi101(Juanda) | 0.487641 | 0.183634 |
+| Juanda | 11 | Juanda | own temporal | psi110(Juanda) | 1.000000 | -0.051619 |
+| Juanda | 11 | Perak1 | spatial weighted | psi111(Juanda) | 0.512359 | 0.321466 |
+| Juanda | 11 | Perak2 | spatial weighted | psi111(Juanda) | 0.487641 | 0.305958 |
+| Juanda | 12 | Juanda | own temporal | psi120(Juanda) | 1.000000 | 0.207949 |
+| Juanda | 12 | Perak1 | spatial weighted | psi121(Juanda) | 0.512359 | 0.238730 |
+| Juanda | 12 | Perak2 | spatial weighted | psi121(Juanda) | 0.487641 | 0.227213 |
+| Perak1 | 1 | Perak1 | own temporal | psi10(Perak1) | 1.000000 | -0.106924 |
+| Perak1 | 1 | Juanda | spatial weighted | psi11(Perak1) | 0.274073 | 0.091178 |
+| Perak1 | 1 | Perak2 | spatial weighted | psi11(Perak1) | 0.725927 | 0.241500 |
+| Perak1 | 2 | Perak1 | own temporal | psi20(Perak1) | 1.000000 | 0.073316 |
+| Perak1 | 2 | Juanda | spatial weighted | psi21(Perak1) | 0.274073 | 0.014824 |
+| Perak1 | 2 | Perak2 | spatial weighted | psi21(Perak1) | 0.725927 | 0.039264 |
+| Perak1 | 3 | Perak1 | own temporal | psi30(Perak1) | 1.000000 | 0.015381 |
+| Perak1 | 3 | Juanda | spatial weighted | psi31(Perak1) | 0.274073 | -0.004698 |
+| Perak1 | 3 | Perak2 | spatial weighted | psi31(Perak1) | 0.725927 | -0.012444 |
+| Perak1 | 4 | Perak1 | own temporal | psi40(Perak1) | 1.000000 | 0.098333 |
+| Perak1 | 4 | Juanda | spatial weighted | psi41(Perak1) | 0.274073 | -0.028988 |
+| Perak1 | 4 | Perak2 | spatial weighted | psi41(Perak1) | 0.725927 | -0.076779 |
+| Perak1 | 5 | Perak1 | own temporal | psi50(Perak1) | 1.000000 | 0.104354 |
+| Perak1 | 5 | Juanda | spatial weighted | psi51(Perak1) | 0.274073 | -0.039515 |
+| Perak1 | 5 | Perak2 | spatial weighted | psi51(Perak1) | 0.725927 | -0.104662 |
+| Perak1 | 6 | Perak1 | own temporal | psi60(Perak1) | 1.000000 | 0.054752 |
+| Perak1 | 6 | Juanda | spatial weighted | psi61(Perak1) | 0.274073 | 0.008074 |
+| Perak1 | 6 | Perak2 | spatial weighted | psi61(Perak1) | 0.725927 | 0.021385 |
+| Perak1 | 7 | Perak1 | own temporal | psi70(Perak1) | 1.000000 | -0.130541 |
+| Perak1 | 7 | Juanda | spatial weighted | psi71(Perak1) | 0.274073 | 0.030980 |
+| Perak1 | 7 | Perak2 | spatial weighted | psi71(Perak1) | 0.725927 | 0.082055 |
+| Perak1 | 8 | Perak1 | own temporal | psi80(Perak1) | 1.000000 | -0.099071 |
+| Perak1 | 8 | Juanda | spatial weighted | psi81(Perak1) | 0.274073 | 0.032187 |
+| Perak1 | 8 | Perak2 | spatial weighted | psi81(Perak1) | 0.725927 | 0.085251 |
+| Perak1 | 9 | Perak1 | own temporal | psi90(Perak1) | 1.000000 | 0.105851 |
+| Perak1 | 9 | Juanda | spatial weighted | psi91(Perak1) | 0.274073 | 0.012600 |
+| Perak1 | 9 | Perak2 | spatial weighted | psi91(Perak1) | 0.725927 | 0.033373 |
+| Perak1 | 10 | Perak1 | own temporal | psi100(Perak1) | 1.000000 | -0.063698 |
+| Perak1 | 10 | Juanda | spatial weighted | psi101(Perak1) | 0.274073 | 0.034439 |
+| Perak1 | 10 | Perak2 | spatial weighted | psi101(Perak1) | 0.725927 | 0.091216 |
+| Perak1 | 11 | Perak1 | own temporal | psi110(Perak1) | 1.000000 | 0.083872 |
+| Perak1 | 11 | Juanda | spatial weighted | psi111(Perak1) | 0.274073 | 0.000816 |
+| Perak1 | 11 | Perak2 | spatial weighted | psi111(Perak1) | 0.725927 | 0.002160 |
+| Perak1 | 12 | Perak1 | own temporal | psi120(Perak1) | 1.000000 | 0.134472 |
+| Perak1 | 12 | Juanda | spatial weighted | psi121(Perak1) | 0.274073 | 0.025092 |
+| Perak1 | 12 | Perak2 | spatial weighted | psi121(Perak1) | 0.725927 | 0.066460 |
+| Perak2 | 1 | Perak2 | own temporal | psi10(Perak2) | 1.000000 | 0.317674 |
+| Perak2 | 1 | Juanda | spatial weighted | psi11(Perak2) | 0.264347 | -0.007650 |
+| Perak2 | 1 | Perak1 | spatial weighted | psi11(Perak2) | 0.735653 | -0.021289 |
+| Perak2 | 2 | Perak2 | own temporal | psi20(Perak2) | 1.000000 | 0.016838 |
+| Perak2 | 2 | Juanda | spatial weighted | psi21(Perak2) | 0.264347 | 0.013147 |
+| Perak2 | 2 | Perak1 | spatial weighted | psi21(Perak2) | 0.735653 | 0.036586 |
+| Perak2 | 3 | Perak2 | own temporal | psi30(Perak2) | 1.000000 | -0.097076 |
+| Perak2 | 3 | Juanda | spatial weighted | psi31(Perak2) | 0.264347 | 0.011121 |
+| Perak2 | 3 | Perak1 | spatial weighted | psi31(Perak2) | 0.735653 | 0.030950 |
+| Perak2 | 4 | Perak2 | own temporal | psi40(Perak2) | 1.000000 | -0.093225 |
+| Perak2 | 4 | Juanda | spatial weighted | psi41(Perak2) | 0.264347 | 0.009226 |
+| Perak2 | 4 | Perak1 | spatial weighted | psi41(Perak2) | 0.735653 | 0.025676 |
+| Perak2 | 5 | Perak2 | own temporal | psi50(Perak2) | 1.000000 | -0.005682 |
+| Perak2 | 5 | Juanda | spatial weighted | psi51(Perak2) | 0.264347 | -0.000914 |
+| Perak2 | 5 | Perak1 | spatial weighted | psi51(Perak2) | 0.735653 | -0.002544 |
+| Perak2 | 6 | Perak2 | own temporal | psi60(Perak2) | 1.000000 | -0.054736 |
+| Perak2 | 6 | Juanda | spatial weighted | psi61(Perak2) | 0.264347 | 0.007456 |
+| Perak2 | 6 | Perak1 | spatial weighted | psi61(Perak2) | 0.735653 | 0.020750 |
+| Perak2 | 7 | Perak2 | own temporal | psi70(Perak2) | 1.000000 | -0.172778 |
+| Perak2 | 7 | Juanda | spatial weighted | psi71(Perak2) | 0.264347 | 0.019938 |
+| Perak2 | 7 | Perak1 | spatial weighted | psi71(Perak2) | 0.735653 | 0.055485 |
+| Perak2 | 8 | Perak2 | own temporal | psi80(Perak2) | 1.000000 | -0.079264 |
+| Perak2 | 8 | Juanda | spatial weighted | psi81(Perak2) | 0.264347 | 0.007642 |
+| Perak2 | 8 | Perak1 | spatial weighted | psi81(Perak2) | 0.735653 | 0.021268 |
+| Perak2 | 9 | Perak2 | own temporal | psi90(Perak2) | 1.000000 | -0.090437 |
+| Perak2 | 9 | Juanda | spatial weighted | psi91(Perak2) | 0.264347 | 0.026687 |
+| Perak2 | 9 | Perak1 | spatial weighted | psi91(Perak2) | 0.735653 | 0.074266 |
+| Perak2 | 10 | Perak2 | own temporal | psi100(Perak2) | 1.000000 | 0.081059 |
+| Perak2 | 10 | Juanda | spatial weighted | psi101(Perak2) | 0.264347 | -0.000094 |
+| Perak2 | 10 | Perak1 | spatial weighted | psi101(Perak2) | 0.735653 | -0.000263 |
+| Perak2 | 11 | Perak2 | own temporal | psi110(Perak2) | 1.000000 | 0.014305 |
+| Perak2 | 11 | Juanda | spatial weighted | psi111(Perak2) | 0.264347 | 0.022298 |
+| Perak2 | 11 | Perak1 | spatial weighted | psi111(Perak2) | 0.735653 | 0.062054 |
+| Perak2 | 12 | Perak2 | own temporal | psi120(Perak2) | 1.000000 | 0.222128 |
+| Perak2 | 12 | Juanda | spatial weighted | psi121(Perak2) | 0.264347 | 0.028349 |
+| Perak2 | 12 | Perak1 | spatial weighted | psi121(Perak2) | 0.735653 | 0.078894 |
 
 ## 6. IIDN residual diagnostics
 

@@ -91,45 +91,24 @@ write.csv(variance_results, file.path(result_dir, "variance_stationarity.csv"), 
 write.csv(mean_results, file.path(result_dir, "mean_stationarity_multiple_lags.csv"), row.names = FALSE)
 write.csv(data.frame(boxcox_applied = apply_boxcox, boxcox_lambda = lambda, boxcox_shift = shift, GSTAR_difference_order = d), file.path(result_dir, "treatment_decision.csv"), row.names = FALSE)
 
-candidate_orders <- 1:12
-fits <- lapply(candidate_orders, function(p) safe(gstar::gstar(train_model, weight = weights, p = p, d = d, est = "OLS")))
-candidate_iidn <- do.call(rbind, lapply(seq_along(candidate_orders), function(index) {
-  candidate_fit <- fits[[index]]
-  if (inherits(candidate_fit, "error")) return(NULL)
-  fitted_candidate <- as.matrix(candidate_fit$fitted_values)
-  observed_candidate <- train_model[(n_train - nrow(fitted_candidate) + 1L):n_train, , drop = FALSE]
-  residual_candidate <- observed_candidate - fitted_candidate
-  do.call(rbind, lapply(seq_along(locations), function(j) {
-    residual <- residual_candidate[, j]
-    mean_test <- safe(t.test(residual, mu = 0))
-    normality_test <- safe(shapiro.test(residual))
-    groups <- factor(rep(c("first_half", "second_half"), c(floor(length(residual) / 2), ceiling(length(residual) / 2))))
-    variance_test <- safe(fligner.test(residual ~ groups))
-    lb10 <- safe(Box.test(residual, lag = min(10, length(residual) - 1L), type = "Ljung-Box"))
-    lb20 <- safe(Box.test(residual, lag = min(20, length(residual) - 1L), type = "Ljung-Box"))
-    data.frame(p = candidate_orders[index], location = locations[j], mean_residual = mean(residual), residual_variance = var(residual), mean_zero_p_value = if (inherits(mean_test, "error")) NA_real_ else mean_test$p.value, normality_shapiro_p_value = if (inherits(normality_test, "error")) NA_real_ else normality_test$p.value, variance_stability_fligner_p_value = if (inherits(variance_test, "error")) NA_real_ else variance_test$p.value, ljung_box_10_p_value = if (inherits(lb10, "error")) NA_real_ else lb10$p.value, ljung_box_20_p_value = if (inherits(lb20, "error")) NA_real_ else lb20$p.value)
-  }))
+max_identification_lag <- min(12L, floor(n_train / 3L))
+identification_values <- if (d == 1L) diff(train_model) else train_model
+acf_pacf_identification <- do.call(rbind, lapply(seq_along(locations), function(j) {
+  series <- identification_values[, j]
+  acf_values <- as.numeric(acf(series, plot = FALSE, lag.max = max_identification_lag)$acf[-1L])
+  pacf_values <- as.numeric(pacf(series, plot = FALSE, lag.max = max_identification_lag)$acf)
+  bound <- qnorm(.975) / sqrt(length(series))
+  data.frame(location = locations[j], lag = seq_len(max_identification_lag), acf = acf_values, pacf = pacf_values, significance_bound = bound, acf_significant = abs(acf_values) > bound, pacf_significant = abs(pacf_values) > bound)
 }))
-candidate_parameters <- do.call(rbind, lapply(seq_along(candidate_orders), function(index) {
-  candidate_fit <- fits[[index]]
-  if (inherits(candidate_fit, "error")) return(NULL)
-  parameter_names <- rownames(candidate_fit$B)
-  if (is.null(parameter_names) || length(parameter_names) != length(candidate_fit$B)) parameter_names <- paste0("parameter_", seq_along(candidate_fit$B))
-  data.frame(p = candidate_orders[index], parameter = parameter_names, estimate = as.numeric(candidate_fit$B), std_error = as.numeric(candidate_fit$std_err), t_value = as.numeric(candidate_fit$t_value), p_value = as.numeric(candidate_fit$p_value))
-}))
-candidate_residual_correlations <- do.call(rbind, lapply(seq_along(candidate_orders), function(index) {
-  candidate_fit <- fits[[index]]
-  if (inherits(candidate_fit, "error")) return(NULL)
-  fitted_candidate <- as.matrix(candidate_fit$fitted_values)
-  observed_candidate <- train_model[(n_train - nrow(fitted_candidate) + 1L):n_train, , drop = FALSE]
-  correlation <- cor(observed_candidate - fitted_candidate)
-  grid <- expand.grid(location_1 = locations, location_2 = locations, stringsAsFactors = FALSE)
-  data.frame(p = candidate_orders[index], grid, correlation = as.vector(correlation))
-}))
-candidate_iidn_summary <- do.call(rbind, lapply(candidate_orders, function(order) {
-  diagnostic <- candidate_iidn[candidate_iidn$p == order, , drop = FALSE]
-  data.frame(p = order, min_mean_zero_p = min(diagnostic$mean_zero_p_value, na.rm = TRUE), min_normality_p = min(diagnostic$normality_shapiro_p_value, na.rm = TRUE), min_variance_stability_p = min(diagnostic$variance_stability_fligner_p_value, na.rm = TRUE), min_ljung_box_10_p = min(diagnostic$ljung_box_10_p_value, na.rm = TRUE), min_ljung_box_20_p = min(diagnostic$ljung_box_20_p_value, na.rm = TRUE), iidn_pass = all(diagnostic$mean_zero_p_value >= .05 & diagnostic$normality_shapiro_p_value >= .05 & diagnostic$variance_stability_fligner_p_value >= .05 & diagnostic$ljung_box_10_p_value >= .05 & diagnostic$ljung_box_20_p_value >= .05), white_noise_pass = all(diagnostic$mean_zero_p_value >= .05 & diagnostic$variance_stability_fligner_p_value >= .05 & diagnostic$ljung_box_10_p_value >= .05 & diagnostic$ljung_box_20_p_value >= .05))
-}))
+for (j in seq_along(locations)) {
+  series <- identification_values[, j]
+  png(file.path(plot_dir, paste0("02_acf_pacf_", tolower(locations[j]), ".png")), 1600, 900, res = 160)
+  par(mfrow = c(1, 2)); acf(series, lag.max = max_identification_lag, main = paste("ACF -", locations[j])); pacf(series, lag.max = max_identification_lag, main = paste("PACF -", locations[j])); dev.off()
+}
+suggested_orders <- sort(unique(c(1L, acf_pacf_identification$lag[acf_pacf_identification$acf_significant], acf_pacf_identification$lag[acf_pacf_identification$pacf_significant])))
+if (!length(suggested_orders)) suggested_orders <- 1L
+write.csv(acf_pacf_identification, file.path(result_dir, "acf_pacf_identification.csv"), row.names = FALSE)
+
 candidate_diagnostic <- function(candidate_fit) {
   if (inherits(candidate_fit, "error")) return(c(coefficients_finite = FALSE, min_ljung_box_p = NA_real_))
   fitted_candidate <- as.matrix(candidate_fit$fitted_values)
@@ -141,12 +120,37 @@ candidate_diagnostic <- function(candidate_fit) {
   }, numeric(1))
   c(coefficients_finite = all(is.finite(candidate_fit$B)), min_ljung_box_p = min(p_values, na.rm = TRUE))
 }
-candidates <- do.call(rbind, lapply(seq_along(candidate_orders), function(index) {
-  fit <- fits[[index]]
-  diagnostic <- candidate_diagnostic(fit)
-  data.frame(p = candidate_orders[index], d = d, fitted = !inherits(fit, "error"), AIC = if (inherits(fit, "error")) NA_real_ else fit$AIC, coefficients_finite = as.logical(diagnostic["coefficients_finite"]), min_ljung_box_p = as.numeric(diagnostic["min_ljung_box_p"]), error = if (inherits(fit, "error")) conditionMessage(fit) else "")
-}))
-candidates <- merge(candidates, candidate_iidn_summary, by = "p", all.x = TRUE, sort = FALSE)
+evaluate_candidates <- function(orders, identification_round) {
+  fits <- lapply(orders, function(p) safe(gstar::gstar(train_model, weight = weights, p = p, d = d, est = "OLS")))
+  names(fits) <- as.character(orders)
+  iidn <- do.call(rbind, lapply(seq_along(orders), function(index) {
+    candidate_fit <- fits[[index]]; if (inherits(candidate_fit, "error")) return(NULL)
+    fitted_candidate <- as.matrix(candidate_fit$fitted_values); observed_candidate <- train_model[(n_train - nrow(fitted_candidate) + 1L):n_train, , drop = FALSE]; residual_candidate <- observed_candidate - fitted_candidate
+    do.call(rbind, lapply(seq_along(locations), function(j) {
+      residual <- residual_candidate[, j]; mean_test <- safe(t.test(residual, mu = 0)); normality_test <- safe(shapiro.test(residual)); groups <- factor(rep(c("first_half", "second_half"), c(floor(length(residual) / 2), ceiling(length(residual) / 2)))); variance_test <- safe(fligner.test(residual ~ groups)); lb10 <- safe(Box.test(residual, lag = min(10, length(residual) - 1L), type = "Ljung-Box")); lb20 <- safe(Box.test(residual, lag = min(20, length(residual) - 1L), type = "Ljung-Box"))
+      data.frame(p = orders[index], location = locations[j], mean_residual = mean(residual), residual_variance = var(residual), mean_zero_p_value = if (inherits(mean_test, "error")) NA_real_ else mean_test$p.value, normality_shapiro_p_value = if (inherits(normality_test, "error")) NA_real_ else normality_test$p.value, variance_stability_fligner_p_value = if (inherits(variance_test, "error")) NA_real_ else variance_test$p.value, ljung_box_10_p_value = if (inherits(lb10, "error")) NA_real_ else lb10$p.value, ljung_box_20_p_value = if (inherits(lb20, "error")) NA_real_ else lb20$p.value)
+    }))
+  }))
+  parameters <- do.call(rbind, lapply(seq_along(orders), function(index) {
+    candidate_fit <- fits[[index]]; if (inherits(candidate_fit, "error")) return(NULL); parameter_names <- rownames(candidate_fit$B); if (is.null(parameter_names) || length(parameter_names) != length(candidate_fit$B)) parameter_names <- paste0("parameter_", seq_along(candidate_fit$B)); data.frame(p = orders[index], parameter = parameter_names, estimate = as.numeric(candidate_fit$B), std_error = as.numeric(candidate_fit$std_err), t_value = as.numeric(candidate_fit$t_value), p_value = as.numeric(candidate_fit$p_value))
+  }))
+  correlations <- do.call(rbind, lapply(seq_along(orders), function(index) {
+    candidate_fit <- fits[[index]]; if (inherits(candidate_fit, "error")) return(NULL); fitted_candidate <- as.matrix(candidate_fit$fitted_values); observed_candidate <- train_model[(n_train - nrow(fitted_candidate) + 1L):n_train, , drop = FALSE]; correlation <- cor(observed_candidate - fitted_candidate); grid <- expand.grid(location_1 = locations, location_2 = locations, stringsAsFactors = FALSE); data.frame(p = orders[index], grid, correlation = as.vector(correlation))
+  }))
+  summary <- do.call(rbind, lapply(orders, function(order) { diagnostic <- iidn[iidn$p == order, , drop = FALSE]; data.frame(p = order, min_mean_zero_p = min(diagnostic$mean_zero_p_value, na.rm = TRUE), min_normality_p = min(diagnostic$normality_shapiro_p_value, na.rm = TRUE), min_variance_stability_p = min(diagnostic$variance_stability_fligner_p_value, na.rm = TRUE), min_ljung_box_10_p = min(diagnostic$ljung_box_10_p_value, na.rm = TRUE), min_ljung_box_20_p = min(diagnostic$ljung_box_20_p_value, na.rm = TRUE), iidn_pass = all(diagnostic$mean_zero_p_value >= .05 & diagnostic$normality_shapiro_p_value >= .05 & diagnostic$variance_stability_fligner_p_value >= .05 & diagnostic$ljung_box_10_p_value >= .05 & diagnostic$ljung_box_20_p_value >= .05), white_noise_pass = all(diagnostic$mean_zero_p_value >= .05 & diagnostic$variance_stability_fligner_p_value >= .05 & diagnostic$ljung_box_10_p_value >= .05 & diagnostic$ljung_box_20_p_value >= .05)) }))
+  candidates <- do.call(rbind, lapply(seq_along(orders), function(index) { fit <- fits[[index]]; diagnostic <- candidate_diagnostic(fit); data.frame(p = orders[index], spatial_lag_order_a = orders[index], own_lag_order_b = orders[index], identification_round = identification_round, d = d, fitted = !inherits(fit, "error"), AIC = if (inherits(fit, "error")) NA_real_ else fit$AIC, coefficients_finite = as.logical(diagnostic["coefficients_finite"]), min_ljung_box_p = as.numeric(diagnostic["min_ljung_box_p"]), error = if (inherits(fit, "error")) conditionMessage(fit) else "") }))
+  list(fits = fits, iidn = iidn, parameters = parameters, correlations = correlations, candidates = merge(candidates, summary, by = "p", all.x = TRUE, sort = FALSE))
+}
+initial_evaluation <- evaluate_candidates(suggested_orders, "ACF/PACF suggestion")
+adequate_initial <- initial_evaluation$candidates$fitted & initial_evaluation$candidates$coefficients_finite & initial_evaluation$candidates$iidn_pass
+remaining_orders <- setdiff(seq_len(max_identification_lag), suggested_orders)
+expanded_evaluation <- if (!any(adequate_initial) && length(remaining_orders)) evaluate_candidates(remaining_orders, "diagnostic-driven re-identification") else NULL
+fits <- c(initial_evaluation$fits, if (!is.null(expanded_evaluation)) expanded_evaluation$fits else list())
+candidate_iidn <- rbind(initial_evaluation$iidn, if (!is.null(expanded_evaluation)) expanded_evaluation$iidn else NULL)
+candidate_parameters <- rbind(initial_evaluation$parameters, if (!is.null(expanded_evaluation)) expanded_evaluation$parameters else NULL)
+candidate_residual_correlations <- rbind(initial_evaluation$correlations, if (!is.null(expanded_evaluation)) expanded_evaluation$correlations else NULL)
+candidates <- rbind(initial_evaluation$candidates, if (!is.null(expanded_evaluation)) expanded_evaluation$candidates else NULL)
+candidate_orders <- candidates$p
 write.csv(candidate_iidn, file.path(result_dir, "candidate_iidn_diagnostics.csv"), row.names = FALSE)
 write.csv(candidate_parameters, file.path(result_dir, "candidate_parameter_estimates.csv"), row.names = FALSE)
 write.csv(candidate_residual_correlations, file.path(result_dir, "candidate_residual_correlations.csv"), row.names = FALSE)
@@ -156,11 +160,37 @@ diagnostically_adequate <- candidates$fitted & candidates$coefficients_finite & 
 white_noise_adequate <- candidates$fitted & candidates$coefficients_finite & candidates$white_noise_pass
 selected_index <- if (any(diagnostically_adequate)) which.min(ifelse(diagnostically_adequate, candidates$AIC, Inf)) else if (any(white_noise_adequate)) which.min(ifelse(white_noise_adequate, candidates$AIC, Inf)) else which.min(ifelse(candidates$fitted & candidates$coefficients_finite, candidates$AIC, Inf))
 selected_order <- candidate_orders[selected_index]
-fit <- fits[[selected_index]]
+fit <- fits[[as.character(selected_order)]]
+selected_model_name <- paste0("GSTAR(", selected_order, ", ", selected_order, ")")
 parameter_names <- rownames(fit$B)
 if (is.null(parameter_names) || length(parameter_names) != length(fit$B)) parameter_names <- paste0("parameter_", seq_along(fit$B))
 coefficients <- data.frame(parameter = parameter_names, estimate = as.numeric(fit$B), std_error = as.numeric(fit$std_err), t_value = as.numeric(fit$t_value), p_value = as.numeric(fit$p_value))
 write.csv(coefficients, file.path(result_dir, "selected_model_coefficients.csv"), row.names = FALSE)
+
+# Paper-style, location-specific equations: own temporal effects plus the
+# spatially weighted effects from every other location at the same lag.
+coefficient_lookup <- setNames(coefficients$estimate, coefficients$parameter)
+model_symbol <- if (apply_boxcox) "Y" else "Z"
+model_prefix <- if (d == 1L) "\\Delta " else ""
+model_variable <- function(location, lag = NULL) {
+  suffix <- if (is.null(lag)) "t" else paste0("t-", lag)
+  paste0(model_prefix, model_symbol, "_{\\text{", location, "},", suffix, "}")
+}
+equation_terms <- do.call(rbind, lapply(seq_along(locations), function(i) do.call(rbind, lapply(seq_len(selected_order), function(k) {
+  own_parameter <- paste0("psi", k, "0(", locations[i], ")")
+  spatial_parameter <- paste0("psi", k, "1(", locations[i], ")")
+  own <- data.frame(location = locations[i], lag = k, source_location = locations[i], effect = "own temporal", parameter = own_parameter, spatial_weight = 1, coefficient = unname(coefficient_lookup[own_parameter]))
+  neighbours <- do.call(rbind, lapply(which(seq_along(locations) != i), function(j) data.frame(location = locations[i], lag = k, source_location = locations[j], effect = "spatial weighted", parameter = spatial_parameter, spatial_weight = weights[i, j], coefficient = unname(coefficient_lookup[spatial_parameter]) * weights[i, j])))
+  rbind(own, neighbours)
+}))))
+write.csv(equation_terms, file.path(result_dir, "selected_model_equation_terms.csv"), row.names = FALSE)
+format_equation <- function(location) {
+  terms <- equation_terms[equation_terms$location == location, , drop = FALSE]
+  term_text <- mapply(function(coefficient, source, lag) paste0(formatC(abs(coefficient), format = "f", digits = 6), " ", model_variable(source, lag)), terms$coefficient, terms$source_location, terms$lag, USE.NAMES = FALSE)
+  signed_terms <- c(if (terms$coefficient[1] < 0) paste0("-", term_text[1]) else term_text[1], ifelse(terms$coefficient[-1L] < 0, paste0(" - ", term_text[-1L]), paste0(" + ", term_text[-1L])))
+  paste0("$$ ", model_variable(location), " = ", paste0(signed_terms, collapse = ""), " + \\varepsilon_{\\text{", location, "},t}. $$")
+}
+final_equations <- unlist(lapply(locations, function(location) c(paste0("### ", location), "", format_equation(location), "")))
 
 fitted_values <- as.matrix(fit$fitted_values)
 actual_fit <- train_model[(n_train - nrow(fitted_values) + 1L):n_train, , drop = FALSE]
@@ -219,7 +249,9 @@ report <- c(
   "2. Build inverse-distance spatial weights.",
   "3. Plot raw training data and check variance/mean stationarity.",
   "4. Apply Box–Cox only if variance is non-stationary; difference only if mean remains non-stationary.",
-  "5. Fit GSTAR candidates, diagnose residuals, then evaluate the untouched test data.", "",
+  "5. Use station-level ACF/PACF to propose several GSTAR temporal orders; fit and diagnose those candidates.",
+  "6. If none of the suggested orders passes the full IIDN diagnostic, return to identification and evaluate the remaining lags through the identification limit.",
+  "7. Evaluate the selected model on the untouched test data.", "",
   "## 1. Coordinates, distances, and spatial weights", "", "### Input coordinates", "", markdown_table(coordinates), "",
   "### Haversine distance matrix (km)", "", markdown_table(distance_report), "",
   "### Row-standardized inverse-distance matrix", "", markdown_table(weight_report), "",
@@ -229,14 +261,21 @@ report <- c(
   paste0("**Decision:** Box–Cox = ", apply_boxcox, "; lambda = ", round(lambda, 6), "; shift = ", round(shift, 6), "; GSTAR d = ", d, "."), "",
   "### All variance-stationarity results", "", markdown_table(variance_results), "",
   "### All mean-stationarity results: ADF lags 0–12 and KPSS", "", markdown_table(mean_results), "",
-  "## 4. Iterative GSTAR candidate identification", "",
-  "Temporal orders p = 1 through p = 12 were fitted in a loop. Every candidate has separate parameter estimates, IIDN diagnostics, and residual cross-location correlations below. A fully IIDN candidate must have p-values of at least 0.05 for mean-zero, normality, variance stability, and both Ljung–Box tests at every location. If no full-IIDN candidate exists, the script selects the lowest-AIC candidate that passes the white-noise checks; otherwise it records the lowest-AIC finite-coefficient fallback.", "",
+  "## 4. ACF/PACF identification and diagnostic iteration", "",
+  paste0("ACF/PACF are calculated separately for each station on the model-scale series, to lag ", max_identification_lag, ". Any statistically significant ACF or PACF lag (95% approximate bounds), plus p = 1, is an initial GSTAR-order suggestion. Suggested orders: **", paste(suggested_orders, collapse = ", "), "**."), "",
+  "### GSTAR(a,b) notation used in this report", "", "Following the course convention, `a` is the maximum temporal lag from other locations through the spatial-weight matrix, and `b` is the maximum temporal lag from the same location. The `gstar` package fits both effect types for every temporal lag from 1 through its single argument `p`; therefore each package candidate `p` is reported here as **GSTAR(a = p, b = p)**. The separate `d` column is the differencing order, not a spatial or temporal lag.", "",
+  "Every suggested candidate has separate parameter estimates, IIDN diagnostics, and residual cross-location correlations below. A fully IIDN candidate must have p-values of at least 0.05 for mean-zero, normality, variance stability, and both Ljung–Box tests at every location. If none of the ACF/PACF suggestions passes the full IIDN checks, the model-identification cycle is repeated by evaluating the remaining lags up to the identification limit. If no full-IIDN candidate exists, the script selects the lowest-AIC candidate that passes the white-noise checks; otherwise it records the lowest-AIC finite-coefficient fallback.", "",
+  "### ACF/PACF values and order suggestions", "", markdown_table(acf_pacf_identification), "",
+  unlist(lapply(locations, function(name) c(paste0("### ", name), "", paste0("![ACF/PACF - ", name, "](plots_rstudio/02_acf_pacf_", tolower(name), ".png)"), ""))),
   "### Candidate summary and selection flags", "", markdown_table(candidates), "",
   "### All candidate parameter estimates", "", markdown_table(candidate_parameters), "",
   "### All candidate IIDN diagnostics", "", markdown_table(candidate_iidn), "",
   "### All candidate residual cross-location correlations", "", markdown_table(candidate_residual_correlations), "",
-  "## 5. Selected GSTAR model", "", paste0("Selected temporal order: **p = ", selected_order, "**; differencing order: **d = ", d, "**."), "",
+  "## 5. Selected GSTAR model", "", paste0("Selected model: **", selected_model_name, "**; package temporal order: **p = ", selected_order, "**; differencing order: **d = ", d, "**."), "",
   "### All parameter estimates", "", markdown_table(coefficients), "",
+  "### Final equations by location", "", paste0("For the selected ", selected_model_name, ", every own-city term uses lags 1 through b = ", selected_order, " and every weighted other-city term uses lags 1 through a = ", selected_order, ". Following the paper's presentation, each equation expands the row-standardized spatial lag into separate terms for the other stations. The equation is on the model scale (Z = raw rainfall here; a Box–Cox-transformed Y or first difference would be labelled if used)."), "",
+  final_equations,
+  "### Expanded equation terms", "", markdown_table(equation_terms), "",
   "## 6. IIDN residual diagnostics", "", "IIDN is assessed as: residual mean near zero (t-test), approximately constant variance (Fligner–Killeen), normality (Shapiro–Wilk), temporal independence (Ljung–Box at lags 10 and 20), and cross-location independence (correlation matrix below). A p-value below 0.05 is evidence against the relevant IIDN condition.", "", "### All IIDN diagnostic results", "", markdown_table(diagnostics), "",
   "### Residual cross-location correlation", "", markdown_table(residual_correlation_report), "",
   unlist(lapply(locations, function(name) c(paste0("### ", name), "", paste0("![Residual diagnostics - ", name, "](plots_rstudio/04_residual_diagnostics_", tolower(name), ".png)"), ""))),
