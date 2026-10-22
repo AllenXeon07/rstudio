@@ -1,0 +1,10 @@
+"stage","location","test","lag","statistic","p_value","stationary"
+"raw_training","Juanda","Fligner-Killeen variance",NA,0.958784122037049,0.327493407586351,TRUE
+"raw_training","Perak1","Fligner-Killeen variance",NA,0.0980581531922528,0.754172488749967,TRUE
+"raw_training","Perak2","Fligner-Killeen variance",NA,2.02967589428519,0.154253499485083,TRUE
+"raw_training_reused","Juanda","Fligner-Killeen variance",NA,0.958784122037049,0.327493407586351,TRUE
+"raw_training_reused","Perak1","Fligner-Killeen variance",NA,0.0980581531922528,0.754172488749967,TRUE
+"raw_training_reused","Perak2","Fligner-Killeen variance",NA,2.02967589428519,0.154253499485083,TRUE
+"first_difference_training","Juanda","Fligner-Killeen variance",NA,0.00303041595861371,0.956099256127871,TRUE
+"first_difference_training","Perak1","Fligner-Killeen variance",NA,0.00236293422746071,0.961230083100846,TRUE
+"first_difference_training","Perak2","Fligner-Killeen variance",NA,0.228124833469284,0.632917735435613,TRUE
